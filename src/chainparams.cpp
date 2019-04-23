@@ -321,7 +321,7 @@ public:
         vSeeds.push_back(CDNSSeedData("z.cash", "dnsseed.testnet.z.cash")); // Zcash
 
         // guarantees the first 2 characters, when base58 encoded, are "tm"
-        base58Prefixes[PUBKEY_ADDRESS]     = {0x1D,0x25};
+        base58Prefixes[PUBKEY_ADDRESS]     = {0x20,0x28};
         // guarantees the first 2 characters, when base58 encoded, are "t2"
         base58Prefixes[SCRIPT_ADDRESS]     = {0x1C,0xBA};
         // the first character, when base58 encoded, is "9" or "c" (as in Bitcoin)
@@ -568,4 +568,31 @@ std::string CChainParams::GetFoundersRewardAddressAtIndex(int i) const {
 void UpdateNetworkUpgradeParameters(Consensus::UpgradeIndex idx, int nActivationHeight)
 {
     regTestParams.UpdateNetworkUpgradeParameters(idx, nActivationHeight);
+}
+
+// To help debugging, let developers change the equihash parameters for a network upgrade.
+// TODO: Restrict this to regtest mode in the future.
+void UpdateEquihashUpgradeParameters(Consensus::UpgradeIndex idx, unsigned int n, unsigned int k)
+{
+    assert(idx > Consensus::BASE_SPROUT && idx < Consensus::MAX_NETWORK_UPGRADES);
+    EquihashUpgradeInfo[idx].N = n;
+    EquihashUpgradeInfo[idx].K = k;
+}
+
+// Return Equihash parameter N at a given block height.
+unsigned int CChainParams::EquihashN(int nHeight) const {
+    unsigned int n = EquihashUpgradeInfo[CurrentEpoch(nHeight, GetConsensus())].N;
+    if (n == EquihashInfo::DEFAULT_PARAMS) {
+        n = nEquihashN;
+    }
+    return n;
+}
+
+// Return Equihash parameter K at a given block height.
+unsigned int CChainParams::EquihashK(int nHeight) const {
+    unsigned int k = EquihashUpgradeInfo[CurrentEpoch(nHeight, GetConsensus())].K;
+    if (k == EquihashInfo::DEFAULT_PARAMS) {
+        k = nEquihashK;
+    }
+    return k;
 }

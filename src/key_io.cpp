@@ -31,6 +31,7 @@ public:
     {
         std::vector<unsigned char> data = m_params.Base58Prefix(CChainParams::PUBKEY_ADDRESS);
         data.insert(data.end(), id.begin(), id.end());
+        LogPrintStr("Encoding key:" + id.ToString() + "\n");
         return EncodeBase58Check(data);
     }
 
@@ -38,10 +39,11 @@ public:
     {
         std::vector<unsigned char> data = m_params.Base58Prefix(CChainParams::SCRIPT_ADDRESS);
         data.insert(data.end(), id.begin(), id.end());
+        LogPrintStr("Encoding script"  + id.ToString() + "\n");
         return EncodeBase58Check(data);
     }
 
-    std::string operator()(const CNoDestination& no) const { return {}; }
+    std::string operator()(const CNoDestination& no) const { LogPrintStr("Encoding noDest\n"); return {}; }
 };
 
 CTxDestination DecodeDestination(const std::string& str, const CChainParams& params)
@@ -53,8 +55,16 @@ CTxDestination DecodeDestination(const std::string& str, const CChainParams& par
         // Public-key-hash-addresses have version 0 (or 111 testnet).
         // The data vector contains RIPEMD160(SHA256(pubkey)), where pubkey is the serialized public key.
         const std::vector<unsigned char>& pubkey_prefix = params.Base58Prefix(CChainParams::PUBKEY_ADDRESS);
-        if (data.size() == hash.size() + pubkey_prefix.size() && std::equal(pubkey_prefix.begin(), pubkey_prefix.end(), data.begin())) {
+        const std::vector<unsigned char> old_pubkey_prefix = {0x1D,0x25};
+
+        LogPrintf("First 2 bytes are: %d %d\n", data.at(0), data.at(1));
+
+        if (data.size() == hash.size() + pubkey_prefix.size() && 
+                (std::equal(pubkey_prefix.begin(), pubkey_prefix.end(), data.begin()) ||
+                 std::equal(old_pubkey_prefix.begin(), old_pubkey_prefix.end(), data.begin()))
+            ) {
             std::copy(data.begin() + pubkey_prefix.size(), data.end(), hash.begin());
+            LogPrintStr("Encoded keyid" + hash.ToString());
             return CKeyID(hash);
         }
         // Script-hash-addresses have version 5 (or 196 testnet).
@@ -62,9 +72,11 @@ CTxDestination DecodeDestination(const std::string& str, const CChainParams& par
         const std::vector<unsigned char>& script_prefix = params.Base58Prefix(CChainParams::SCRIPT_ADDRESS);
         if (data.size() == hash.size() + script_prefix.size() && std::equal(script_prefix.begin(), script_prefix.end(), data.begin())) {
             std::copy(data.begin() + script_prefix.size(), data.end(), hash.begin());
+            LogPrintStr("Encoded script" + hash.ToString());
             return CScriptID(hash);
         }
     }
+    LogPrintStr("Encoded nodest\n");
     return CNoDestination();
 }
 
