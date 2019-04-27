@@ -106,8 +106,8 @@ public:
         consensus.vUpgrades[Consensus::UPGRADE_OVERWINTER].nActivationHeight = 347500;
         consensus.vUpgrades[Consensus::UPGRADE_SAPLING].nProtocolVersion = 170007;
         consensus.vUpgrades[Consensus::UPGRADE_SAPLING].nActivationHeight = 419200;
-        consensus.vUpgrades[Consensus::UPGRADE_BLOSSOM].nProtocolVersion = 170009;
-        consensus.vUpgrades[Consensus::UPGRADE_BLOSSOM].nActivationHeight =
+        consensus.vUpgrades[Consensus::UPGRADE_YCASH].nProtocolVersion = 170009;
+        consensus.vUpgrades[Consensus::UPGRADE_YCASH].nActivationHeight =
             Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
 
         // The best chain should have at least this much work.
@@ -272,6 +272,7 @@ public:
         consensus.nMajorityRejectBlockOutdated = 75;
         consensus.nMajorityWindow = 400;
         consensus.powLimit = uint256S("07ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
+        //consensus.powLimit = uint256S("0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f");
         consensus.nPowAveragingWindow = 17;
         assert(maxUint/UintToArith256(consensus.powLimit) >= consensus.nPowAveragingWindow);
         consensus.nPowMaxAdjustDown = 32; // 32% adjustment down
@@ -288,9 +289,8 @@ public:
         consensus.vUpgrades[Consensus::UPGRADE_OVERWINTER].nActivationHeight = 207500;
         consensus.vUpgrades[Consensus::UPGRADE_SAPLING].nProtocolVersion = 170007;
         consensus.vUpgrades[Consensus::UPGRADE_SAPLING].nActivationHeight = 280000;
-        consensus.vUpgrades[Consensus::UPGRADE_BLOSSOM].nProtocolVersion = 170008;
-        consensus.vUpgrades[Consensus::UPGRADE_BLOSSOM].nActivationHeight =
-            Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
+        consensus.vUpgrades[Consensus::UPGRADE_YCASH].nProtocolVersion = 270008;
+        consensus.vUpgrades[Consensus::UPGRADE_YCASH].nActivationHeight = 478989;
 
         // The best chain should have at least this much work.
         consensus.nMinimumChainWork = uint256S("0x00000000000000000000000000000000000000000000000000000001d0c4d9cd");
@@ -321,7 +321,7 @@ public:
         vSeeds.push_back(CDNSSeedData("z.cash", "dnsseed.testnet.z.cash")); // Zcash
 
         // guarantees the first 2 characters, when base58 encoded, are "tm"
-        base58Prefixes[PUBKEY_ADDRESS]     = {0x1C,0x90}; // original - {0x20,0x28};
+        base58Prefixes[PUBKEY_ADDRESS]     = {0x20,0x28}; // original - {0x20,0x28}; s =  {0x1C,0x90};
         // guarantees the first 2 characters, when base58 encoded, are "t2"
         base58Prefixes[SCRIPT_ADDRESS]     = {0x1C,0xBA};
         // the first character, when base58 encoded, is "9" or "c" (as in Bitcoin)
@@ -330,13 +330,13 @@ public:
         base58Prefixes[EXT_PUBLIC_KEY]     = {0x04,0x35,0x87,0xCF};
         base58Prefixes[EXT_SECRET_KEY]     = {0x04,0x35,0x83,0x94};
         // guarantees the first 2 characters, when base58 encoded, are "zt"
-        base58Prefixes[ZCPAYMENT_ADDRRESS] = {0x15,0xB6};
+        base58Prefixes[ZCPAYMENT_ADDRRESS] = {0x16,0xB6}; // zt - {0x16,0xB6}; yt - {0x15,0xB6}
         // guarantees the first 4 characters, when base58 encoded, are "ZiVt"
         base58Prefixes[ZCVIEWING_KEY]      = {0xA8,0xAC,0x0C};
         // guarantees the first 2 characters, when base58 encoded, are "ST"
         base58Prefixes[ZCSPENDING_KEY]     = {0xAC,0x08};
 
-        bech32HRPs[SAPLING_PAYMENT_ADDRESS]      = "ytestsapling";
+        bech32HRPs[SAPLING_PAYMENT_ADDRESS]      = "ztestsapling";
         bech32HRPs[SAPLING_FULL_VIEWING_KEY]     = "zviewtestsapling";
         bech32HRPs[SAPLING_INCOMING_VIEWING_KEY] = "zivktestsapling";
         bech32HRPs[SAPLING_EXTENDED_SPEND_KEY]   = "secret-extended-key-test";
@@ -422,8 +422,8 @@ public:
         consensus.vUpgrades[Consensus::UPGRADE_SAPLING].nProtocolVersion = 170006;
         consensus.vUpgrades[Consensus::UPGRADE_SAPLING].nActivationHeight =
             Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
-        consensus.vUpgrades[Consensus::UPGRADE_BLOSSOM].nProtocolVersion = 170008;
-        consensus.vUpgrades[Consensus::UPGRADE_BLOSSOM].nActivationHeight =
+        consensus.vUpgrades[Consensus::UPGRADE_YCASH].nProtocolVersion = 170008;
+        consensus.vUpgrades[Consensus::UPGRADE_YCASH].nActivationHeight =
             Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
 
         // The best chain should have at least this much work.
@@ -466,7 +466,7 @@ public:
             0
         };
         // These prefixes are the same as the testnet prefixes
-        base58Prefixes[PUBKEY_ADDRESS]     = {0x1C,0x90};
+        base58Prefixes[PUBKEY_ADDRESS]     = {0x1D,0x25};
         base58Prefixes[SCRIPT_ADDRESS]     = {0x1C,0xBA};
         base58Prefixes[SECRET_KEY]         = {0xEF};
         // do not rely on these BIP32 prefixes; they are not specified and may change
@@ -476,7 +476,7 @@ public:
         base58Prefixes[ZCVIEWING_KEY]      = {0xA8,0xAC,0x0C};
         base58Prefixes[ZCSPENDING_KEY]     = {0xAC,0x08};
 
-        bech32HRPs[SAPLING_PAYMENT_ADDRESS]      = "yregtestsapling";
+        bech32HRPs[SAPLING_PAYMENT_ADDRESS]      = "zregtestsapling";
         bech32HRPs[SAPLING_FULL_VIEWING_KEY]     = "zviewregtestsapling";
         bech32HRPs[SAPLING_INCOMING_VIEWING_KEY] = "zivkregtestsapling";
         bech32HRPs[SAPLING_EXTENDED_SPEND_KEY]   = "secret-extended-key-regtest";

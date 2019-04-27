@@ -16,6 +16,17 @@
 
 #include "sodium.h"
 
+unsigned int ReduceDifficultyBy(const CBlockIndex* pindexLast, int64_t multiplier, const Consensus::Params& params) {
+    arith_uint256 target;
+    target.SetCompact(pindexLast->nBits);
+    target *= multiplier;
+    const arith_uint256 pow_limit = UintToArith256(params.powLimit);
+    if (target > pow_limit) {
+        target = pow_limit;
+    }
+    return target.GetCompact();
+}
+
 unsigned int GetNextWorkRequired(const CBlockIndex* pindexLast, const CBlockHeader *pblock, const Consensus::Params& params)
 {
     unsigned int nProofOfWorkLimit = UintToArith256(params.powLimit).GetCompact();
@@ -23,6 +34,14 @@ unsigned int GetNextWorkRequired(const CBlockIndex* pindexLast, const CBlockHead
     // Genesis block
     if (pindexLast == NULL)
         return nProofOfWorkLimit;
+
+    int nHeight = pindexLast->nHeight + 1;
+
+    // TODO(A): Fix the constants and make the POW limit a multiplier of the current one. 
+    if (nHeight >= 478989 && nHeight <= 478989 + 5) {
+        LogPrintStr("Returned a reduced PoW limit\n");
+        return nProofOfWorkLimit;
+    }
 
     {
         // Comparing to pindexLast->nHeight with >= because this function
