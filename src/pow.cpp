@@ -38,7 +38,8 @@ unsigned int GetNextWorkRequired(const CBlockIndex* pindexLast, const CBlockHead
     int nHeight = pindexLast->nHeight + 1;
 
     // TODO(A): Fix the constants and make the POW limit a multiplier of the current one. 
-    if (nHeight >= 478989 && nHeight <= 478989 + 5) {
+    if (nHeight >= params.vUpgrades[Consensus::UPGRADE_YCASH].nActivationHeight && 
+            nHeight <= params.vUpgrades[Consensus::UPGRADE_YCASH].nActivationHeight + 5) {
         LogPrintStr("Returned a reduced PoW limit\n");
         return nProofOfWorkLimit;
     }
