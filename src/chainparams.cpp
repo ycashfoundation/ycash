@@ -290,7 +290,7 @@ public:
         consensus.vUpgrades[Consensus::UPGRADE_SAPLING].nProtocolVersion = 170007;
         consensus.vUpgrades[Consensus::UPGRADE_SAPLING].nActivationHeight = 280000;
         consensus.vUpgrades[Consensus::UPGRADE_YCASH].nProtocolVersion = 270008;
-        consensus.vUpgrades[Consensus::UPGRADE_YCASH].nActivationHeight = 482798;
+        consensus.vUpgrades[Consensus::UPGRADE_YCASH].nActivationHeight = 482902;
 
         // The best chain should have at least this much work.
         consensus.nMinimumChainWork = uint256S("0x00000000000000000000000000000000000000000000000000000001d0c4d9cd");
@@ -548,7 +548,8 @@ std::string CChainParams::GetFoundersRewardAddressAtHeight(int nHeight) const {
         size_t i = nHeight / addressChangeInterval;
         return vFoundersRewardAddress[i];
     } else {
-        return vYcashFoundersRewardAddress[0];
+        // TODO (A): Replace these with YCash foundation addresses.
+        return "s4k5ZMauJJUqLsQo6LuDUYxQpYkhBNBg1rK";
     }
 }
 
@@ -557,14 +558,21 @@ std::string CChainParams::GetFoundersRewardAddressAtHeight(int nHeight) const {
 CScript CChainParams::GetFoundersRewardScriptAtHeight(int nHeight) const {
     if (CurrentEpoch(nHeight, this->GetConsensus()) < Consensus::UPGRADE_YCASH) {
         assert(nHeight > 0 && nHeight <= consensus.GetLastFoundersRewardBlockHeight());
-    }
 
-    CTxDestination address = DecodeDestination(GetFoundersRewardAddressAtHeight(nHeight).c_str());
-    assert(IsValidDestination(address));
-    assert(boost::get<CScriptID>(&address) != nullptr);
-    CScriptID scriptID = boost::get<CScriptID>(address); // address is a boost variant
-    CScript script = CScript() << OP_HASH160 << ToByteVector(scriptID) << OP_EQUAL;
-    return script;
+        CTxDestination address = DecodeDestination(GetFoundersRewardAddressAtHeight(nHeight).c_str());
+        assert(IsValidDestination(address));
+        assert(boost::get<CScriptID>(&address) != nullptr);
+        CScriptID scriptID = boost::get<CScriptID>(address); // address is a boost variant
+        CScript script = CScript() << OP_HASH160 << ToByteVector(scriptID) << OP_EQUAL;
+        return script;
+    } else {
+        CTxDestination address = DecodeDestination(GetFoundersRewardAddressAtHeight(nHeight).c_str());
+        assert(IsValidDestination(address));
+        assert(boost::get<CKeyID>(&address) != nullptr);
+        CScriptID keyID = boost::get<CKeyID>(address); // address is a boost variant
+        CScript script =  CScript() << OP_DUP << OP_HASH160 << ToByteVector(keyID) << OP_EQUALVERIFY << OP_CHECKSIG;
+        return script;
+    }
 }
 
 std::string CChainParams::GetFoundersRewardAddressAtIndex(int i) const {
