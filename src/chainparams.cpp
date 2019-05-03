@@ -386,6 +386,11 @@ public:
             };
         assert(vFoundersRewardAddress.size() <= consensus.GetLastFoundersRewardBlockHeight());
     }
+
+    void SetForkBlockNumber(int blockNumber) {
+        consensus.vUpgrades[Consensus::UPGRADE_YCASH].nActivationHeight = blockNumber;
+    }
+
 };
 static CTestNetParams testNetParams;
 
@@ -578,6 +583,10 @@ void UpdateEquihashUpgradeParameters(Consensus::UpgradeIndex idx, unsigned int n
     assert(idx > Consensus::BASE_SPROUT && idx < Consensus::MAX_NETWORK_UPGRADES);
     EquihashUpgradeInfo[idx].N = n;
     EquihashUpgradeInfo[idx].K = k;
+}
+
+void SetTestnetForkBlock(int blockNumber) {
+    testNetParams.SetForkBlockNumber(blockNumber);
 }
 
 // Return Equihash parameter N at a given block height.

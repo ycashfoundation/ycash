@@ -1106,6 +1106,15 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
         }
     }
 
+    if (mapArgs.count("-testnetforkblock")) {
+        int forkBlock = GetArg("-testnetforkblock", 0);
+        if (forkBlock <= 0) {
+            return InitError(_("Invalid fork block number"));
+        } else {
+            SetTestnetForkBlock(forkBlock);
+        }
+    }
+
     if (!mapMultiArgs["-nuparams"].empty()) {
         // Allow overriding network upgrade parameters for testing
         if (Params().NetworkIDString() != "regtest") {

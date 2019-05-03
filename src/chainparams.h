@@ -169,4 +169,6 @@ void UpdateNetworkUpgradeParameters(Consensus::UpgradeIndex idx, int nActivation
  */
 void UpdateEquihashUpgradeParameters(Consensus::UpgradeIndex idx, unsigned int n, unsigned int k);
 
+void SetTestnetForkBlock(int blockNumber);
+
 #endif // BITCOIN_CHAINPARAMS_H
