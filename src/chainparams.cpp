@@ -385,6 +385,10 @@ public:
             "t29pHDBWq7qN4EjwSEHg8wEqYe9pkmVrtRP", "t2Ez9KM8VJLuArcxuEkNRAkhNvidKkzXcjJ", "t2D5y7J5fpXajLbGrMBQkFg2mFN8fo3n8cX", "t2UV2wr1PTaUiybpkV3FdSdGxUJeZdZztyt", 
             };
         assert(vFoundersRewardAddress.size() <= consensus.GetLastFoundersRewardBlockHeight());
+
+        vYcashFoundersRewardAddress = {
+            "s4k5ZMauJJUqLsQo6LuDUYxQpYkhBNBg1rK", // TODO (A): Add the YCash Foundation's addresses
+        };
     }
 };
 static CTestNetParams testNetParams;
@@ -540,6 +544,7 @@ bool SelectParamsFromCommandLine()
 // Block height must be >0 and <=last founders reward block height
 // Index variable i ranges from 0 - (vFoundersRewardAddress.size()-1)
 std::string CChainParams::GetFoundersRewardAddressAtHeight(int nHeight) const {
+    // Pre YCash
     if (CurrentEpoch(nHeight, this->GetConsensus()) < Consensus::UPGRADE_YCASH) {
         int maxHeight = consensus.GetLastFoundersRewardBlockHeight();
         assert(nHeight > 0 && nHeight <= maxHeight);
@@ -548,13 +553,14 @@ std::string CChainParams::GetFoundersRewardAddressAtHeight(int nHeight) const {
         size_t i = nHeight / addressChangeInterval;
         return vFoundersRewardAddress[i];
     } else {
-        // TODO (A): Replace these with YCash foundation addresses.
-        return "s4k5ZMauJJUqLsQo6LuDUYxQpYkhBNBg1rK";
+        // TODO (A): Return from the vector based on the height. 
+        return vYcashFoundersRewardAddress[0];
     }
 }
 
-// Block height must be >0 and <=last founders reward block height
-// The founders reward address is expected to be a multisig (P2SH) address
+// Block height must be >0 and <=last founders reward block height for pre YCash. The founders reward address
+// is expected to be a multisig (P2SH) address.
+// Post YCash, return a regular address (For now)
 CScript CChainParams::GetFoundersRewardScriptAtHeight(int nHeight) const {
     if (CurrentEpoch(nHeight, this->GetConsensus()) < Consensus::UPGRADE_YCASH) {
         assert(nHeight > 0 && nHeight <= consensus.GetLastFoundersRewardBlockHeight());
@@ -568,10 +574,17 @@ CScript CChainParams::GetFoundersRewardScriptAtHeight(int nHeight) const {
     } else {
         CTxDestination address = DecodeDestination(GetFoundersRewardAddressAtHeight(nHeight).c_str());
         assert(IsValidDestination(address));
-        assert(boost::get<CKeyID>(&address) != nullptr);
-        CScriptID keyID = boost::get<CKeyID>(address); // address is a boost variant
-        CScript script =  CScript() << OP_DUP << OP_HASH160 << ToByteVector(keyID) << OP_EQUALVERIFY << OP_CHECKSIG;
-        return script;
+        assert(boost::get<CKeyID>(&address) != nullptr || boost::get<CScriptID>(&address) != nullptr);
+
+        if (boost::get<CKeyID>(&address) != nullptr) { // Address is a regular address
+            CScriptID keyID = boost::get<CKeyID>(address); 
+            CScript script =  CScript() << OP_DUP << OP_HASH160 << ToByteVector(keyID) << OP_EQUALVERIFY << OP_CHECKSIG;
+            return script;
+        } else { // Address is multisig address
+            CScriptID scriptID = boost::get<CScriptID>(address); 
+            CScript script = CScript() << OP_HASH160 << ToByteVector(scriptID) << OP_EQUAL;
+            return script;
+        }
     }
 }
 
