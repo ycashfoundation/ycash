@@ -472,7 +472,7 @@ string experimentalDisabledHelpMsg(const string& rpc, const string& enableArg)
     return "\nWARNING: " + rpc + " is disabled.\n"
         "To enable it, restart zcashd with the -experimentalfeatures and\n"
         "-" + enableArg + " commandline options, or add these two lines\n"
-        "to the zcash.conf file:\n\n"
+        "to the ycash.conf file:\n\n"
         "experimentalfeatures=1\n"
         + enableArg + "=1\n";
 }
