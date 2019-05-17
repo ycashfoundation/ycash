@@ -145,10 +145,10 @@ public:
 
         // guarantees the first 2 characters, when base58 encoded, are "s1"
         base58Prefixes[PUBKEY_ADDRESS]       = {0x1C,0x28};
-        base58Prefixes[ZCASH_PUBKEY_ADDRESS] = {0x1C,0xB8};
+        base58Prefixes[ZCASH_PUBKEY_ADDRESS] = {0x1C,0xB8}; // "t1"
         // guarantees the first 2 characters, when base58 encoded, are "s3"
         base58Prefixes[SCRIPT_ADDRESS]       = {0x1C,0x2C}; 
-        base58Prefixes[ZCASH_SCRIPT_ADDRESS] = {0x1C,0xBD};
+        base58Prefixes[ZCASH_SCRIPT_ADDRESS] = {0x1C,0xBD}; // "t3"
         // the first character, when base58 encoded, is "5" or "K" or "L" (as in Bitcoin)
         base58Prefixes[SECRET_KEY]         = {0x80};
         // do not rely on these BIP32 prefixes; they are not specified and may change
@@ -156,7 +156,7 @@ public:
         base58Prefixes[EXT_SECRET_KEY]     = {0x04,0x88,0xAD,0xE4};
         // guarantees the first 2 characters, when base58 encoded, are "yc"
         base58Prefixes[ZCPAYMENT_ADDRRESS]       = {0x16,0x36};
-        base58Prefixes[ZCASH_ZCPAYMENT_ADDRRESS] = {0x16,0x9A};
+        base58Prefixes[ZCASH_ZCPAYMENT_ADDRRESS] = {0x16,0x9A}; // "zc"
         // guarantees the first 4 characters, when base58 encoded, are "ZiVK"
         base58Prefixes[ZCVIEWING_KEY]      = {0xA8,0xAB,0xD3};
         // guarantees the first 2 characters, when base58 encoded, are "SK"
@@ -325,10 +325,10 @@ public:
 
         // guarantees the first 2 characters, when base58 encoded, are "sm"
         base58Prefixes[PUBKEY_ADDRESS]       = {0x1C,0x95}; 
-        base58Prefixes[ZCASH_PUBKEY_ADDRESS] = {0x1D,0x25};
-        // guarantees the first 2 characters, when base58 encoded, are "t2"
+        base58Prefixes[ZCASH_PUBKEY_ADDRESS] = {0x1D,0x25}; // "tm"
+        // guarantees the first 2 characters, when base58 encoded, are "s2"
         base58Prefixes[SCRIPT_ADDRESS]           = {0x1C,0x2A};
-        base58Prefixes[ZCASH_SCRIPT_ADDRESS]     = {0x1C,0xBA};
+        base58Prefixes[ZCASH_SCRIPT_ADDRESS]     = {0x1C,0xBA};  // "t2"
         // the first character, when base58 encoded, is "9" or "c" (as in Bitcoin)
         base58Prefixes[SECRET_KEY]         = {0xEF};
         // do not rely on these BIP32 prefixes; they are not specified and may change
@@ -336,7 +336,7 @@ public:
         base58Prefixes[EXT_SECRET_KEY]     = {0x04,0x35,0x83,0x94};
         // guarantees the first 2 characters, when base58 encoded, are "yt"
         base58Prefixes[ZCPAYMENT_ADDRRESS]       = {0x16,0x52}; 
-        base58Prefixes[ZCASH_ZCPAYMENT_ADDRRESS] = {0x16,0xB6}; 
+        base58Prefixes[ZCASH_ZCPAYMENT_ADDRRESS] = {0x16,0xB6}; // "zt"
         // guarantees the first 4 characters, when base58 encoded, are "ZiVt"
         base58Prefixes[ZCVIEWING_KEY]      = {0xA8,0xAC,0x0C};
         // guarantees the first 2 characters, when base58 encoded, are "ST"
