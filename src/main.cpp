@@ -3915,7 +3915,13 @@ bool ContextualCheckBlock(const CBlock& block, CValidationState& state, CBlockIn
 
     // If this is initial block download and "verifypowonly" is set, we'll skip verifying the transactions
     if (IsInitialBlockDownload() && GetBoolArg("-verifypowonly", false)) {
-        return true;
+        if (fCheckpointsEnabled) {
+            CBlockIndex *pindexLastCheckpoint = Checkpoints::GetLastCheckpoint(Params().Checkpoints());
+            if (pindexLastCheckpoint && pindexLastCheckpoint->GetAncestor(pindexPrev->nHeight) == pindexPrev) {
+                // This block is connecting to an ancestor of a checkpoint: disable script checks
+                return true;
+            }
+        }
     }
 
     // Check that all transactions are finalized
