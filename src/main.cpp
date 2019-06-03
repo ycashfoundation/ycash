@@ -3779,8 +3779,8 @@ bool CheckBlock(const CBlock& block, CValidationState& state,
             return state.DoS(100, error("CheckBlock(): more than one coinbase"),
                              REJECT_INVALID, "bad-cb-multiple");
 
-    // If this is initial block download and "verifypowonly" is set, we'll skip verifying the transactions
-    if (IsInitialBlockDownload() && GetBoolArg("-verifypowonly", false)) {
+    // If this is initial block download and "fastsync" is set, we'll skip verifying the transactions
+    if (IsInitialBlockDownload() && GetBoolArg("-fastsync", false)) {
         return true;
     }
 
@@ -3913,14 +3913,12 @@ bool ContextualCheckBlock(const CBlock& block, CValidationState& state, CBlockIn
         }
     }
 
-    // If this is initial block download and "verifypowonly" is set, we'll skip verifying the transactions
-    if (IsInitialBlockDownload() && GetBoolArg("-verifypowonly", false)) {
-        if (fCheckpointsEnabled) {
-            CBlockIndex *pindexLastCheckpoint = Checkpoints::GetLastCheckpoint(Params().Checkpoints());
-            if (pindexLastCheckpoint && pindexLastCheckpoint->GetAncestor(pindexPrev->nHeight) == pindexPrev) {
-                // This block is connecting to an ancestor of a checkpoint: disable script checks
+    // If this is initial block download and "fastsync" is set, we'll skip verifying the transactions
+    if (IsInitialBlockDownload() && GetBoolArg("-fastsync", false)) {
+        // The method is called GetTotalBlocksEstimate, but it really returns the last checkpoint block height
+        if (fCheckpointsEnabled &&
+                nHeight < Checkpoints::GetTotalBlocksEstimate(Params().Checkpoints())) {  
                 return true;
-            }
         }
     }
 
