@@ -20,6 +20,8 @@ static const int32_t SAPLING_MIN_TX_VERSION = 4;
 static const int32_t SAPLING_MAX_TX_VERSION = 4;
 /** The maximum allowed size for a serialized block, in bytes (network rule) */
 static const unsigned int MAX_BLOCK_SIZE = 2000000;
+/** The maximuma allowed size for a YCash serialized block, in bytes (network rule) */
+static const unsigned int YCASH_MAX_BLOCK_SIZE = 4000000;
 /** The maximum allowed number of signature check operations in a block (network rule) */
 static const unsigned int MAX_BLOCK_SIGOPS = 20000;
 /** The maximum size of a transaction (network rule) */
