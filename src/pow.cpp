@@ -63,14 +63,14 @@ unsigned int GetNextWorkRequired(const CBlockIndex* pindexLast, const CBlockHead
             return difficulty;
         } else if (pblock && pblock->GetBlockTime() > pindexLast->GetBlockTime() + params.nPowTargetSpacing * 6) {
             // If > 15 mins, allow low estimate difficulty
-            unsigned int difficulty = IncreaseDifficultyBy(nProofOfWorkLimit, 100, params);
+            unsigned int difficulty = IncreaseDifficultyBy(nProofOfWorkLimit, 2, params);
             arith_uint256 target;
             target.SetCompact(difficulty);
             LogPrintf("Returning level 2 difficulty: %s\n", target.GetHex());
             return difficulty;
         } else if (pblock && pblock->GetBlockTime() > pindexLast->GetBlockTime() + params.nPowTargetSpacing * 2) {
             // If > 5 mins, allow high estimate difficulty
-            unsigned int difficulty = IncreaseDifficultyBy(nProofOfWorkLimit, 100000, params);
+            unsigned int difficulty = IncreaseDifficultyBy(nProofOfWorkLimit, 10, params);
             arith_uint256 target;
             target.SetCompact(difficulty);
             LogPrintf("Returning level 3 difficulty: %s\n", target.GetHex());
