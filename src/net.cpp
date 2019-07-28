@@ -1863,7 +1863,7 @@ void RelayTransaction(const CTransaction& tx)
     // Prevent realying transactions that are really big, because this may be a spam 
     // attack.
     int maxRelaySize = GetArg("-maxtxrelaysize", MAX_TX_RELAY_SIZE);
-    if (ss.size() > MAX_TX_RELAY_SIZE) {
+    if (ss.size() > maxRelaySize) {
         return;
     }
 
