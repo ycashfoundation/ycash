@@ -1867,6 +1867,15 @@ void RelayTransaction(const CTransaction& tx)
         return;
     }
 
+    // Prevent relaying transactions if we are still syncing, because we don't
+    // know what future forks might be active, and if the Txns are valid in
+    // nodes that are fully synced. This will prevent us from getting banned
+    // for relaying Txns that we think are valid, but are invalid with future 
+    // forks.
+    if (IsInitialBlockDownload()) {
+        return;
+    }
+
     RelayTransaction(tx, ss);
 }
 
