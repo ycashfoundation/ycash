@@ -1873,6 +1873,7 @@ void RelayTransaction(const CTransaction& tx)
     // for relaying Txns that we think are valid, but are invalid with future 
     // forks.
     if (IsInitialBlockDownload()) {
+        LogPrint("net", "Not relaying Tx since we're still syncing: %s", tx.GetHash().ToString());
         return;
     }
 
