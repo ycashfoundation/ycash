@@ -2511,7 +2511,8 @@ int CWallet::ScanForWalletTransactions(CBlockIndex* pindexStart, bool fUpdate)
             if (pindex->nHeight % 100 == 0 && dProgressTip - dProgressStart > 0.0) {
                 LOCK(cs_rescan);
                 dRescanProgress = (Checkpoints::GuessVerificationProgress(chainParams.Checkpoints(), pindex, false) - dProgressStart) / (dProgressTip - dProgressStart);
-                ShowProgress(_("Rescanning..."), std::max(1, std::min(99, (int)(*dRescanProgress * 100))));
+                dRescanProgress = std::max(1.0, std::min(99.0, *dRescanProgress * 100));
+                ShowProgress(_("Rescanning..."), (int)(*dRescanProgress));
             }
 
             CBlock block;
