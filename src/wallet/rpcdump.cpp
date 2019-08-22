@@ -103,7 +103,7 @@ UniValue rescanblockchain(const UniValue& params, bool fHelp)
     // Height to rescan from
     int nRescanHeight = 0;
     if (params.size() > 0)
-        nRescanHeight = params[1].get_int();
+        nRescanHeight = params[0].get_int();
     if (nRescanHeight < 0 || nRescanHeight > chainActive.Height()) {
         throw JSONRPCError(RPC_INVALID_PARAMETER, "Block height out of range");
     }
