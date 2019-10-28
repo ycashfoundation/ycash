@@ -151,14 +151,6 @@ TEST(founders_reward_test, mainnet_get_last_block) {
     EXPECT_EQ(1, params.Halving(lastFRHeight + 1));
 }
 
-TEST(founders_reward_test, mainnet_get_last_block) {
-    SelectParams(CBaseChainParams::MAIN);
-    auto params = Params().GetConsensus();
-    int lastFRHeight = GetLastFoundersRewardHeight(params);
-    EXPECT_EQ(0, params.Halving(lastFRHeight));
-    EXPECT_EQ(1, params.Halving(lastFRHeight + 1));
-}
-
 // Ycash fork happened in the middle of a address transition, so there's an extra one.
 #define NUM_MAINNET_FOUNDER_ADDRESSES (48 + 1)
 
