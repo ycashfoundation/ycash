@@ -391,7 +391,6 @@ bool AsyncRPCOperation_sendmany::main_impl() {
             LOCK2(cs_main, pwalletMain->cs_wallet);
 
             EnsureWalletIsUnlocked();
-            
             CPubKey vchPubKey;
             bool ret = pwalletMain->GetKeyFromPool(vchPubKey);
             if (!ret) {
@@ -1080,8 +1079,8 @@ UniValue AsyncRPCOperation_sendmany::perform_joinsplit(
 
     uint256 esk; // payment disclosure - secret
 
+    assert(mtx.fOverwintered && (mtx.nVersion >= SAPLING_TX_VERSION));
     JSDescription jsdesc = JSDescription::Randomized(
-            mtx.fOverwintered && (mtx.nVersion >= SAPLING_TX_VERSION),
             *pzcashParams,
             joinSplitPubKey_,
             anchor,
