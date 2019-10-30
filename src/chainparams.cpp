@@ -124,7 +124,7 @@ public:
         consensus.vUpgrades[Consensus::UPGRADE_BLOSSOM].nActivationHeight = Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
 
         // The best chain should have at least this much work.
-        consensus.nMinimumChainWork = uint256S("000000000000000000000000000000000000000000000000017e73a331fae01c");
+        consensus.nMinimumChainWork = uint256S("00000000000000000000000000000000000000000000000000eeaf43c4e72d49");
 
         /**
          * The message start string should be awesome! ⓩ❤
@@ -343,7 +343,7 @@ public:
         consensus.vUpgrades[Consensus::UPGRADE_BLOSSOM].nActivationHeight = Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
 
         // The best chain should have at least this much work.
-        consensus.nMinimumChainWork = uint256S("0x0000000000000000000000000000000000000000000000000000001dbb4c4224");
+        consensus.nMinimumChainWork = uint256S("0x00000000000000000000000000000000000000000000000000000001d0c4d9cd");
 
         pchMessageStart[0] = 0xfa;
         pchMessageStart[1] = 0x1a;
