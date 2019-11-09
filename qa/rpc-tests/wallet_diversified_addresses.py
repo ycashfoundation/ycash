@@ -9,20 +9,24 @@ from test_framework.test_framework import BitcoinTestFramework
 from test_framework.authproxy import JSONRPCException
 from test_framework.util import (
     assert_equal, assert_true, assert_not_equal, start_nodes,
-    get_coinbase_address,
+    get_coinbase_address, connect_nodes_bi,
     wait_and_assert_operationid_status
 )
 from decimal import Decimal
 
 
 class WalletImportExportTest (BitcoinTestFramework):
-    
-    def setup_nodes(self):
-        return start_nodes(4, self.options.tmpdir, [[
-            '-nuparams=5ba81b19:201', # Overwinter
-            '-nuparams=76b809bb:203', # Sapling
-            '-experimentalfeatures', '-zmergetoaddress',
-        ]] * 4)
+
+    def setup_network(self, split=False):
+        self.nodes = self.setup_nodes()
+
+        connect_nodes_bi(self.nodes,0,1)
+        connect_nodes_bi(self.nodes,1,2)
+        connect_nodes_bi(self.nodes,0,3)
+        connect_nodes_bi(self.nodes,1,3)
+
+        self.is_network_split=False
+        self.sync_all()
 
     def verify_diversified_set(self, noderef, base_addr, alladdrs):
         qalladdrs = noderef.z_getalldiversifiedaddresses(base_addr)

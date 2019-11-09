@@ -19,21 +19,14 @@ from decimal import Decimal
 # Test wallet change address behaviour
 class WalletChangeAddressesTest(BitcoinTestFramework):
 
-    def setup_chain(self):
-        print("Initializing test directory " + self.options.tmpdir)
-        initialize_chain_clean(self.options.tmpdir, 2)
+    def setup_network(self, split=False):
+        self.nodes = self.setup_nodes()
 
-    def setup_network(self):
-        args = [
-            '-nuparams=5ba81b19:1', # Overwinter
-            '-nuparams=76b809bb:1', # Sapling
-            '-txindex',             # Avoid JSONRPC error: No information available about transaction
-            '-experimentalfeatures', '-zmergetoaddress',
-        ]
-        self.nodes = []
-        self.nodes.append(start_node(0, self.options.tmpdir, args))
-        self.nodes.append(start_node(1, self.options.tmpdir, args))
         connect_nodes_bi(self.nodes,0,1)
+        connect_nodes_bi(self.nodes,1,2)
+        connect_nodes_bi(self.nodes,0,3)
+        connect_nodes_bi(self.nodes,1,3)
+
         self.is_network_split=False
         self.sync_all()
 
@@ -51,7 +44,7 @@ class WalletChangeAddressesTest(BitcoinTestFramework):
             recipients = [{"address": taddrSource, "amount": Decimal('2')}]
             myopid = self.nodes[0].z_sendmany(midAddr, recipients, 1, 0)
             wait_and_assert_operationid_status(self.nodes[0], myopid)
-            self.nodes[1].generate(1)
+            self.nodes[0].generate(1)
             self.sync_all()
 
         def check_change_taddr_reuse(target):
