@@ -103,7 +103,8 @@ BOOST_AUTO_TEST_CASE(subsidy_limit_test)
     // Reducing the interval further to 1.25 minutes has a similar effect,
     // decreasing the total monetary supply by another 0.09240 ZEC.
     // BOOST_CHECK_EQUAL(nSum, 2099999990760000ULL);
-    BOOST_CHECK_EQUAL(nSum, 2099999981520000LL);
+    // YCASH: Because Ycash has a permanant 5% subsidy, the numbers have to be adjusted    
+    BOOST_CHECK_EQUAL(nSum, 2099999990760000LL);
 }
 
 bool ReturnFalse() { return false; }

@@ -278,18 +278,18 @@ BOOST_AUTO_TEST_CASE(rpc_wallet)
 
     BOOST_CHECK_NO_THROW(retValue = CallRPC("getblocksubsidy 653599")); // Blossom activation - 1
     obj = retValue.get_obj();
-    BOOST_CHECK_EQUAL(find_value(obj, "miner").get_real(), 10.0);
-    BOOST_CHECK_EQUAL(find_value(obj, "founders").get_real(), 2.5);
+    BOOST_CHECK_EQUAL(find_value(obj, "miner").get_real(), 11.875);
+    BOOST_CHECK_EQUAL(find_value(obj, "founders").get_real(), 0.625);
 
-    BOOST_CHECK_NO_THROW(retValue = CallRPC("getblocksubsidy 653600")); // Blossom activation
+    BOOST_CHECK_NO_THROW(retValue = CallRPC("getblocksubsidy 653600")); // Blossom activation, no effect on Ycash
     obj = retValue.get_obj();
-    BOOST_CHECK_EQUAL(find_value(obj, "miner").get_real(), 5.0);
-    BOOST_CHECK_EQUAL(find_value(obj, "founders").get_real(), 1.25);
+    BOOST_CHECK_EQUAL(find_value(obj, "miner").get_real(), 11.875);
+    BOOST_CHECK_EQUAL(find_value(obj, "founders").get_real(), 0.625);
 
     BOOST_CHECK_NO_THROW(retValue = CallRPC("getblocksubsidy 1046399"));
     obj = retValue.get_obj();
-    BOOST_CHECK_EQUAL(find_value(obj, "miner").get_real(), 5.0);
-    BOOST_CHECK_EQUAL(find_value(obj, "founders").get_real(), 1.25);
+    BOOST_CHECK_EQUAL(find_value(obj, "miner").get_real(), 5.9375); // Ycash - 95% to miner
+    BOOST_CHECK_EQUAL(find_value(obj, "founders").get_real(), 0.3125); // Ycash - 5% to dev fee 
     // slow start + blossom activation + (pre blossom halving - blossom activation) * 2
     BOOST_CHECK_NO_THROW(retValue = CallRPC("getblocksubsidy 1046400"));
     obj = retValue.get_obj();
@@ -302,8 +302,8 @@ BOOST_AUTO_TEST_CASE(rpc_wallet)
 
     BOOST_CHECK_NO_THROW(retValue = CallRPC("getblocksubsidy 2726400"));
     obj = retValue.get_obj();
-    BOOST_CHECK_EQUAL(find_value(obj, "miner").get_real(), 1.5625);
-    BOOST_CHECK_EQUAL(find_value(obj, "founders").get_real(), 0.0);
+    BOOST_CHECK_EQUAL(find_value(obj, "miner").get_real(), 1.484375);   // Ycash 9% to miner
+    BOOST_CHECK_EQUAL(find_value(obj, "founders").get_real(), 0.078125);  // Ycash 5% dev fee
 
     /*
      * getblock
