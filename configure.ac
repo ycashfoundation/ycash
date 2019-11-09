@@ -2,7 +2,7 @@ dnl require autoconf 2.60 (AS_ECHO/AS_ECHO_N)
 AC_PREREQ([2.60])
 define(_CLIENT_VERSION_MAJOR, 2)
 define(_CLIENT_VERSION_MINOR, 0)
-define(_CLIENT_VERSION_REVISION, 7)
+define(_CLIENT_VERSION_REVISION, 8)
 define(_CLIENT_VERSION_BUILD, 50)
 define(_ZC_BUILD_VAL, m4_if(m4_eval(_CLIENT_VERSION_BUILD < 25), 1, m4_incr(_CLIENT_VERSION_BUILD), m4_eval(_CLIENT_VERSION_BUILD < 50), 1, m4_eval(_CLIENT_VERSION_BUILD - 24), m4_eval(_CLIENT_VERSION_BUILD == 50), 1, , m4_eval(_CLIENT_VERSION_BUILD - 50)))
 define(_CLIENT_VERSION_SUFFIX, m4_if(m4_eval(_CLIENT_VERSION_BUILD < 25), 1, _CLIENT_VERSION_REVISION-beta$1, m4_eval(_CLIENT_VERSION_BUILD < 50), 1, _CLIENT_VERSION_REVISION-rc$1, m4_eval(_CLIENT_VERSION_BUILD == 50), 1, _CLIENT_VERSION_REVISION, _CLIENT_VERSION_REVISION-$1)))
@@ -106,6 +106,12 @@ AC_ARG_ENABLE(tests,
     AS_HELP_STRING([--enable-tests],[compile tests (default is yes)]),
     [use_tests=$enableval],
     [use_tests=yes])
+
+AC_ARG_ENABLE([fuzz-main],
+  [AS_HELP_STRING([--enable-fuzz-main],
+  [Replace main() with a stub for fuzzing (default is no)])],
+  [use_fuzz_main=$enableval],
+  [use_fuzz_main=no])
 
 AC_ARG_ENABLE([asan],
   [AS_HELP_STRING([--enable-asan],
@@ -445,6 +451,11 @@ fi
 if test x$TARGET_OS != xwindows; then
   # All windows code is PIC, forcing it on just adds useless compile warnings
   AX_CHECK_COMPILE_FLAG([-fPIC],[PIC_FLAGS="-fPIC"])
+fi
+
+if test x$use_fuzz_main == xyes; then
+    CFLAGS="$CFLAGS -DZCASH_FUZZ=1"
+    CXXFLAGS="$CXXFLAGS -DZCASH_FUZZ=1"
 fi
 
 #asan and tsan cannot be used together

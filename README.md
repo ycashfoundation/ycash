@@ -1,4 +1,4 @@
-Ycash v2.0.7
+Ycash v2.0.8
 <img align="right" width="120" height="80" src="https://www.ycash.xyz/y_sign.png">
 
 What is Ycash?
@@ -34,7 +34,7 @@ Refer also to the [Zcash user guide](https://zcash.readthedocs.io/en/latest/rtd_
 
 ### Need Help?
 
-* :blue_book: See the Zcash documentation at the [ReadtheDocs](https://zcash.readthedocs.io)
+* :blue_book: See the documentation at the [ReadTheDocs](https://zcash.readthedocs.io)
   for help and more information.
 * :incoming_envelope: Ask for help on the [Ycash Discord](https://discord.gg/Yz8rW7P).
 

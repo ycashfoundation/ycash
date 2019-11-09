@@ -114,3 +114,5 @@ contrib/debian/substvars
 ycashprotocol.pdf
 ycashprotocol.aux
 ycashprotocol.*.gz
+src/fuzzing/*/output
+src/fuzz.cpp
