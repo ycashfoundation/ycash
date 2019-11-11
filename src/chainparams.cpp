@@ -120,12 +120,14 @@ public:
             uint256S("00000000025a57200d898ac7f21e26bf29028bbe96ec46e05b2c17cc9db9e4f3");
         consensus.vUpgrades[Consensus::UPGRADE_YCASH].nProtocolVersion = 270007;
         consensus.vUpgrades[Consensus::UPGRADE_YCASH].nActivationHeight = 570000;
+        consensus.vUpgrades[Consensus::UPGRADE_YCASH].hashActivationBlock =
+            uint256S("0000014fbc5917ba8bcacf3336faf588d86b32443aa3a490a587af5750c77ec5");
         
         consensus.vUpgrades[Consensus::UPGRADE_BLOSSOM].nProtocolVersion = 270008;
         consensus.vUpgrades[Consensus::UPGRADE_BLOSSOM].nActivationHeight = Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
 
         // The best chain should have at least this much work.
-        consensus.nMinimumChainWork = uint256S("00000000000000000000000000000000000000000000000000eeaf43c4e72d49");
+        consensus.nMinimumChainWork = uint256S("0000000000000000000000000000000000000000000000000152d411d731d250");
 
         /**
          * The message start string should be awesome! ⓩ❤
@@ -340,11 +342,14 @@ public:
             uint256S("000420e7fcc3a49d729479fb0b560dd7b8617b178a08e9e389620a9d1dd6361a");
         consensus.vUpgrades[Consensus::UPGRADE_YCASH].nProtocolVersion = 270007;
         consensus.vUpgrades[Consensus::UPGRADE_YCASH].nActivationHeight = 510248;   // Around June 7, 2019
+        consensus.vUpgrades[Consensus::UPGRADE_YCASH].hashActivationBlock =
+            uint256S("0305d164e8f4dc75b9e9a6a15b7b381dbc1c9cb55f1534267be7c125923255c8");
+        
         consensus.vUpgrades[Consensus::UPGRADE_BLOSSOM].nProtocolVersion = 270008;
         consensus.vUpgrades[Consensus::UPGRADE_BLOSSOM].nActivationHeight = Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
 
         // The best chain should have at least this much work.
-        consensus.nMinimumChainWork = uint256S("0x00000000000000000000000000000000000000000000000000000001d0c4d9cd");
+        consensus.nMinimumChainWork = uint256S("0x0000000000000000000000000000000000000000000000000000001958c35a99");
 
         pchMessageStart[0] = 0xfa;
         pchMessageStart[1] = 0x1a;
