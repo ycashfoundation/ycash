@@ -79,7 +79,7 @@ testScripts=(
     'p2p_node_bloom.py'
     'regtest_signrawtransaction.py'
     'finalsaplingroot.py'
-    'shorter_block_times.py'
+#    'shorter_block_times.py'
     'sprout_sapling_migration.py'
     'turnstile.py'
 );
@@ -121,6 +121,7 @@ function runTestScript
     shift
 
     echo -e "=== Running testscript ${testName} ==="
+    rm -rf cache/
 
     local startTime=$(date +%s)
     if eval "$@"
