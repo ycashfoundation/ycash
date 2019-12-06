@@ -21,10 +21,7 @@ class MempoolUpgradeActivationTest(BitcoinTestFramework):
 
     def setup_network(self):
         args = ["-checkmempool", "-debug=mempool", "-blockmaxsize=4000",
-            "-nuparams=5ba81b19:200", # Overwinter
-            "-nuparams=76b809bb:210", # Sapling
-            #"-nuparams=374d694f:219", # Ycash
-            #"-nuparams=2bb40e60:220", # Blossom
+            "-nuparams=374d694f:200", # Ycash
         ]
         self.nodes = []
         self.nodes.append(start_node(0, self.options.tmpdir, args))
@@ -176,7 +173,7 @@ class MempoolUpgradeActivationTest(BitcoinTestFramework):
             self.nodes[1].generate(6)
             self.sync_all()
 
-        print('Testing Sapling -> Blossom activation boundary')
+        print('Testing Sapling -> Ycash activation boundary')
         # Current height = 195
         nu_activation_checks()
         # Current height = 205

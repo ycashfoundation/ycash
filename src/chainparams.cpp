@@ -569,6 +569,8 @@ public:
         // Founders reward script expects a vector of 2-of-3 multisig addresses
         vFoundersRewardAddress = { "t2FwcEhFdNXuFMv1tcYwaBJtYVtMj8b1uTg" };
         assert(vFoundersRewardAddress.size() <= consensus.GetLastFoundersRewardBlockHeight(0));
+
+        vYcashFoundersRewardAddress = { "smDw2LWkeuJ1NGBDDZvdNbzY8A9D1mkkDZm" };
     }
 
     void UpdateNetworkUpgradeParameters(Consensus::UpgradeIndex idx, int nActivationHeight)
@@ -725,6 +727,10 @@ void UpdateEquihashUpgradeParameters(Consensus::UpgradeIndex idx, unsigned int n
 
 // Return Equihash parameter N at a given block height.
 unsigned int CChainParams::EquihashN(int nHeight) const {
+    if (Params().MineBlocksOnDemand()) {
+        return GetConsensus().nEquihashN;
+    }
+
     unsigned int n = EquihashUpgradeInfo[CurrentEpoch(nHeight, GetConsensus())].N;
     if (n == EquihashInfo::DEFAULT_PARAMS) {
         n = GetConsensus().nEquihashN;
@@ -734,6 +740,10 @@ unsigned int CChainParams::EquihashN(int nHeight) const {
 
 // Return Equihash parameter K at a given block height.
 unsigned int CChainParams::EquihashK(int nHeight) const {
+    if (Params().MineBlocksOnDemand()) {
+        return GetConsensus().nEquihashK;
+    }
+
     unsigned int k = EquihashUpgradeInfo[CurrentEpoch(nHeight, GetConsensus())].K;
     if (k == EquihashInfo::DEFAULT_PARAMS) {
         k = GetConsensus().nEquihashK;
