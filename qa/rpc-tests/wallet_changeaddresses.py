@@ -22,6 +22,15 @@ class WalletChangeAddressesTest(BitcoinTestFramework):
     def setup_network(self, split=False):
         self.nodes = self.setup_nodes()
 
+    def setup_network(self):
+        args = [
+            '-nuparams=5ba81b19:1', # Overwinter
+            '-nuparams=76b809bb:1', # Sapling
+            '-txindex'              # Avoid JSONRPC error: No information available about transaction
+        ]
+        self.nodes = []
+        self.nodes.append(start_node(0, self.options.tmpdir, args))
+        self.nodes.append(start_node(1, self.options.tmpdir, args))
         connect_nodes_bi(self.nodes,0,1)
         connect_nodes_bi(self.nodes,1,2)
         connect_nodes_bi(self.nodes,0,3)
@@ -42,20 +51,21 @@ class WalletChangeAddressesTest(BitcoinTestFramework):
         taddrSource = self.nodes[0].getnewaddress()
         for _ in range(6):
             recipients = [{"address": taddrSource, "amount": Decimal('2')}]
-            myopid = self.nodes[0].z_sendmany(midAddr, recipients, 1, 0)
+            myopid = self.nodes[0].z_sendmany(midAddr, recipients, 1, Decimal('0'))
             wait_and_assert_operationid_status(self.nodes[0], myopid)
-            self.nodes[0].generate(1)
+            self.sync_all()
+            self.nodes[1].generate(1)
             self.sync_all()
 
         def check_change_taddr_reuse(target):
             recipients = [{"address": target, "amount": Decimal('1')}]
 
             # Send funds to recipient address twice
-            myopid = self.nodes[0].z_sendmany(taddrSource, recipients, 1, 0)
+            myopid = self.nodes[0].z_sendmany(taddrSource, recipients, 1, Decimal('0'))
             txid1 = wait_and_assert_operationid_status(self.nodes[0], myopid)
             self.nodes[1].generate(1)
             self.sync_all()
-            myopid = self.nodes[0].z_sendmany(taddrSource, recipients, 1, 0)
+            myopid = self.nodes[0].z_sendmany(taddrSource, recipients, 1, Decimal('0'))
             txid2 = wait_and_assert_operationid_status(self.nodes[0], myopid)
             self.nodes[1].generate(1)
             self.sync_all()

@@ -3,8 +3,8 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or https://www.opensource.org/licenses/mit-license.php .
 
-#ifndef BITCOIN_WALLET_WALLET_ISMINE_H
-#define BITCOIN_WALLET_WALLET_ISMINE_H
+#ifndef BITCOIN_SCRIPT_ISMINE_H
+#define BITCOIN_SCRIPT_ISMINE_H
 
 #include "key.h"
 #include "script/standard.h"
@@ -16,8 +16,12 @@ class CScript;
 enum isminetype
 {
     ISMINE_NO = 0,
-    ISMINE_WATCH_ONLY = 1,
-    ISMINE_SPENDABLE = 2,
+    //! Indicates that we dont know how to create a scriptSig that would solve this if we were given the appropriate private keys
+    ISMINE_WATCH_UNSOLVABLE = 1,
+    //! Indicates that we know how to create a scriptSig that would solve this if we were given the appropriate private keys
+    ISMINE_WATCH_SOLVABLE = 2,
+    ISMINE_WATCH_ONLY = ISMINE_WATCH_SOLVABLE | ISMINE_WATCH_UNSOLVABLE,
+    ISMINE_SPENDABLE = 4,
     ISMINE_ALL = ISMINE_WATCH_ONLY | ISMINE_SPENDABLE
 };
 /** used for bitflags of isminetype */
@@ -26,4 +30,4 @@ typedef uint8_t isminefilter;
 isminetype IsMine(const CKeyStore& keystore, const CScript& scriptPubKey);
 isminetype IsMine(const CKeyStore& keystore, const CTxDestination& dest);
 
-#endif // BITCOIN_WALLET_WALLET_ISMINE_H
+#endif // BITCOIN_SCRIPT_ISMINE_H

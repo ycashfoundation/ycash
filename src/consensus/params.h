@@ -28,6 +28,7 @@ enum UpgradeIndex : uint32_t {
     UPGRADE_SAPLING,
     UPGRADE_YCASH,
     UPGRADE_BLOSSOM,
+    UPGRADE_HEARTWOOD,
     // NOTE: Also add new upgrades to NetworkUpgradeInfo in upgrades.cpp
     MAX_NETWORK_UPGRADES
 };
@@ -98,7 +99,7 @@ struct Params {
 
     uint256 hashGenesisBlock;
 
-    bool fCoinbaseMustBeProtected;
+    bool fCoinbaseMustBeShielded;
 
     /** Needs to evenly divide MAX_SUBSIDY to avoid rounding errors. */
     int nSubsidySlowStartInterval;

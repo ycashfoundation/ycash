@@ -9,7 +9,7 @@
 #include "main.h"
 #include "wallet/wallet.h"
 
-#include "test/test_bitcoin.h"
+#include "wallet/test/wallet_test_fixture.h"
 
 #include "zcash/Address.hpp"
 
@@ -55,11 +55,11 @@ static UniValue ValueFromString(const std::string &str)
     return value;
 }
 
-BOOST_FIXTURE_TEST_SUITE(rpc_wallet_tests, TestingSetup)
+BOOST_FIXTURE_TEST_SUITE(rpc_wallet_tests, WalletTestingSetup)
 
 BOOST_AUTO_TEST_CASE(rpc_addmultisig)
 {
-    LOCK(pwalletMain->cs_wallet);
+    LOCK2(cs_main, pwalletMain->cs_wallet);
 
     rpcfn_type addmultisig = tableRPC["addmultisigaddress"]->actor;
 
@@ -334,7 +334,7 @@ BOOST_AUTO_TEST_CASE(rpc_wallet_getbalance)
 {
     SelectParams(CBaseChainParams::TESTNET);
 
-    LOCK(pwalletMain->cs_wallet);
+    LOCK2(cs_main, pwalletMain->cs_wallet);
 
 
     BOOST_CHECK_THROW(CallRPC("z_getbalance too many args"), runtime_error);
@@ -934,7 +934,7 @@ BOOST_AUTO_TEST_CASE(rpc_z_sendmany_parameters)
 {
     SelectParams(CBaseChainParams::TESTNET);
 
-    LOCK(pwalletMain->cs_wallet);
+    LOCK2(cs_main, pwalletMain->cs_wallet);
 
     BOOST_CHECK_THROW(CallRPC("z_sendmany"), runtime_error);
     BOOST_CHECK_THROW(CallRPC("z_sendmany toofewargs"), runtime_error);
@@ -1059,7 +1059,7 @@ BOOST_AUTO_TEST_CASE(rpc_z_sendmany_internals)
     SelectParams(CBaseChainParams::TESTNET);
     auto consensusParams = Params().GetConsensus();
 
-    LOCK(pwalletMain->cs_wallet);
+    LOCK2(cs_main, pwalletMain->cs_wallet);
 
     UniValue retValue;
 
@@ -1268,7 +1268,7 @@ BOOST_AUTO_TEST_CASE(rpc_z_sendmany_taddr_to_sapling)
 {
     RegtestActivateSapling();
 
-    LOCK(pwalletMain->cs_wallet);
+    LOCK2(cs_main, pwalletMain->cs_wallet);
 
     if (!pwalletMain->HaveHDSeed()) {
         pwalletMain->GenerateNewSeed();
@@ -1488,7 +1488,7 @@ BOOST_AUTO_TEST_CASE(rpc_z_listunspent_parameters)
 {
     SelectParams(CBaseChainParams::TESTNET);
 
-    LOCK(pwalletMain->cs_wallet);
+    LOCK2(cs_main, pwalletMain->cs_wallet);
 
     UniValue retValue;
 
@@ -1537,7 +1537,7 @@ BOOST_AUTO_TEST_CASE(rpc_z_shieldcoinbase_parameters)
 {
     SelectParams(CBaseChainParams::TESTNET);
 
-    LOCK(pwalletMain->cs_wallet);
+    LOCK2(cs_main, pwalletMain->cs_wallet);
 
     BOOST_CHECK_THROW(CallRPC("z_shieldcoinbase"), runtime_error);
     BOOST_CHECK_THROW(CallRPC("z_shieldcoinbase toofewargs"), runtime_error);
@@ -1617,7 +1617,7 @@ BOOST_AUTO_TEST_CASE(rpc_z_shieldcoinbase_internals)
     SelectParams(CBaseChainParams::TESTNET);
     auto consensusParams = Params().GetConsensus();
 
-    LOCK(pwalletMain->cs_wallet);
+    LOCK2(cs_main, pwalletMain->cs_wallet);
 
     // Mutable tx containing contextual information we need to build tx
     // We removed the ability to create pre-Sapling Sprout proofs, so we can
@@ -1625,22 +1625,9 @@ BOOST_AUTO_TEST_CASE(rpc_z_shieldcoinbase_internals)
     int nHeight = consensusParams.vUpgrades[Consensus::UPGRADE_SAPLING].nActivationHeight;
     CMutableTransaction mtx = CreateNewContextualCMutableTransaction(consensusParams, nHeight + 1);
 
-    // Test that option -mempooltxinputlimit is respected.
-    mapArgs["-mempooltxinputlimit"] = "1";
-
     // Add keys manually
     auto pa = pwalletMain->GenerateNewSproutZKey();
     std::string zaddr = EncodePaymentAddress(pa);
-
-    // Supply 2 inputs when mempool limit is 1
-    {
-        std::vector<ShieldCoinbaseUTXO> inputs = { ShieldCoinbaseUTXO{uint256(),0,0}, ShieldCoinbaseUTXO{uint256(),0,0} };
-        std::shared_ptr<AsyncRPCOperation> operation( new AsyncRPCOperation_shieldcoinbase(TransactionBuilder(), mtx, inputs, zaddr) );
-        operation->main();
-        BOOST_CHECK(operation->isFailed());
-        std::string msg = operation->getErrorMessage();
-        BOOST_CHECK( msg.find("Number of inputs 2 is greater than mempooltxinputlimit of 1") != string::npos);
-    }
 
     // Insufficient funds
     {
@@ -1685,14 +1672,7 @@ BOOST_AUTO_TEST_CASE(rpc_z_mergetoaddress_parameters)
 {
     SelectParams(CBaseChainParams::TESTNET);
 
-    LOCK(pwalletMain->cs_wallet);
-
-    CheckRPCThrows("z_mergetoaddress 1 2",
-        "Error: z_mergetoaddress is disabled. Run './zcash-cli help z_mergetoaddress' for instructions on how to enable this feature.");
-
-    // Set global state required for z_mergetoaddress
-    fExperimentalMode = true;
-    mapArgs["-zmergetoaddress"] = "1";
+    LOCK2(cs_main, pwalletMain->cs_wallet);
 
     BOOST_CHECK_THROW(CallRPC("z_mergetoaddress"), runtime_error);
     BOOST_CHECK_THROW(CallRPC("z_mergetoaddress toofewargs"), runtime_error);
@@ -1831,10 +1811,6 @@ BOOST_AUTO_TEST_CASE(rpc_z_mergetoaddress_parameters)
     } catch (const UniValue& objError) {
         BOOST_CHECK( find_error(objError, "Invalid recipient address"));
     }
-
-    // Un-set global state
-    fExperimentalMode = false;
-    mapArgs.erase("-zmergetoaddress");
 }
 
 
@@ -1844,7 +1820,7 @@ BOOST_AUTO_TEST_CASE(rpc_z_mergetoaddress_internals)
     SelectParams(CBaseChainParams::TESTNET);
     auto consensusParams = Params().GetConsensus();
 
-    LOCK(pwalletMain->cs_wallet);
+    LOCK2(cs_main, pwalletMain->cs_wallet);
 
     UniValue retValue;
 
@@ -1854,27 +1830,11 @@ BOOST_AUTO_TEST_CASE(rpc_z_mergetoaddress_internals)
     int nHeight = consensusParams.vUpgrades[Consensus::UPGRADE_SAPLING].nActivationHeight;
     CMutableTransaction mtx = CreateNewContextualCMutableTransaction(consensusParams, nHeight + 1);
 
-    // Test that option -mempooltxinputlimit is respected.
-    mapArgs["-mempooltxinputlimit"] = "1";
-
     // Add keys manually
     BOOST_CHECK_NO_THROW(retValue = CallRPC("getnewaddress"));
     MergeToAddressRecipient taddr1(retValue.get_str(), "");
     auto pa = pwalletMain->GenerateNewSproutZKey();
     MergeToAddressRecipient zaddr1(EncodePaymentAddress(pa), "DEADBEEF");
-
-    // Supply 2 inputs when mempool limit is 1
-    {
-        std::vector<MergeToAddressInputUTXO> inputs = {
-            MergeToAddressInputUTXO{COutPoint{uint256(),0},0, CScript()},
-            MergeToAddressInputUTXO{COutPoint{uint256(),0},0, CScript()}
-        };
-        std::shared_ptr<AsyncRPCOperation> operation( new AsyncRPCOperation_mergetoaddress(boost::none, mtx, inputs, {}, {}, zaddr1) );
-        operation->main();
-        BOOST_CHECK(operation->isFailed());
-        std::string msg = operation->getErrorMessage();
-        BOOST_CHECK( msg.find("Number of transparent inputs 2 is greater than mempooltxinputlimit of 1") != string::npos);
-    }
 
     // Insufficient funds
     {

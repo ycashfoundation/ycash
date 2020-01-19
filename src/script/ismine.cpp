@@ -3,16 +3,36 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or https://www.opensource.org/licenses/mit-license.php .
 
-#include "wallet_ismine.h"
+#include "ismine.h"
 
 #include "key.h"
 #include "keystore.h"
 #include "script/script.h"
 #include "script/standard.h"
+#include "script/sign.h"
 
 #include <boost/foreach.hpp>
 
 using namespace std;
+
+namespace {
+
+/**
+ * This is an enum that tracks the execution context of a script, similar to
+ * SigVersion in script/interpreter. It is separate however because we want to
+ * distinguish between top-level scriptPubKey execution and P2SH redeemScript
+ * execution (a distinction that has no impact on consensus rules).
+ */
+enum class IsMineSigVersion
+{
+    TOP = 0,        //! scriptPubKey execution
+    P2SH = 1,       //! P2SH redeemScript
+};
+
+bool PermitsUncompressed(IsMineSigVersion sigversion)
+{
+    return sigversion == IsMineSigVersion::TOP || sigversion == IsMineSigVersion::P2SH;
+}
 
 typedef vector<unsigned char> valtype;
 
@@ -28,19 +48,13 @@ unsigned int HaveKeys(const vector<valtype>& pubkeys, const CKeyStore& keystore)
     return nResult;
 }
 
-isminetype IsMine(const CKeyStore &keystore, const CTxDestination& dest)
-{
-    CScript script = GetScriptForDestination(dest);
-    return IsMine(keystore, script);
-}
-
-isminetype IsMine(const CKeyStore &keystore, const CScript& scriptPubKey)
+isminetype IsMineInner(const CKeyStore& keystore, const CScript& scriptPubKey, IsMineSigVersion sigversion)
 {
     vector<valtype> vSolutions;
     txnouttype whichType;
     if (!Solver(scriptPubKey, whichType, vSolutions)) {
         if (keystore.HaveWatchOnly(scriptPubKey))
-            return ISMINE_WATCH_ONLY;
+            return ISMINE_WATCH_UNSOLVABLE;
         return ISMINE_NO;
     }
 
@@ -65,7 +79,7 @@ isminetype IsMine(const CKeyStore &keystore, const CScript& scriptPubKey)
         CScriptID scriptID = CScriptID(uint160(vSolutions[0]));
         CScript subscript;
         if (keystore.GetCScript(scriptID, subscript)) {
-            isminetype ret = IsMine(keystore, subscript);
+            isminetype ret = IsMineInner(keystore, subscript, IsMineSigVersion::P2SH);
             if (ret == ISMINE_SPENDABLE)
                 return ret;
         }
@@ -74,6 +88,9 @@ isminetype IsMine(const CKeyStore &keystore, const CScript& scriptPubKey)
 
     case TX_MULTISIG:
     {
+        // Never treat bare multisig outputs as ours (they can still be made watchonly-though)
+        if (sigversion == IsMineSigVersion::TOP) break;
+
         // Only consider transactions "mine" if we own ALL the
         // keys involved. Multi-signature transactions that are
         // partially owned (somebody else has a key that can spend
@@ -86,7 +103,23 @@ isminetype IsMine(const CKeyStore &keystore, const CScript& scriptPubKey)
     }
     }
 
-    if (keystore.HaveWatchOnly(scriptPubKey))
-        return ISMINE_WATCH_ONLY;
+    if (keystore.HaveWatchOnly(scriptPubKey)) {
+        // TODO: This could be optimized some by doing some work after the above solver
+        SignatureData sigs;
+        return ProduceSignature(DummySignatureCreator(&keystore), scriptPubKey, sigs, 0) ? ISMINE_WATCH_SOLVABLE : ISMINE_WATCH_UNSOLVABLE;
+    }
     return ISMINE_NO;
+}
+
+} // namespace
+
+isminetype IsMine(const CKeyStore& keystore, const CScript& scriptPubKey)
+{
+    return IsMineInner(keystore, scriptPubKey, IsMineSigVersion::TOP);
+}
+
+isminetype IsMine(const CKeyStore& keystore, const CTxDestination& dest)
+{
+    CScript script = GetScriptForDestination(dest);
+    return IsMine(keystore, script);
 }
