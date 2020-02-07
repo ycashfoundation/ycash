@@ -21,13 +21,13 @@ static const int SAPLING_VALUE_VERSION = 1010100;
  * Maximum amount of time that a block timestamp is allowed to be ahead of the
  * median-time-past of the previous block.
  */
-static const int64_t MAX_FUTURE_BLOCK_TIME_MTP = 90 * 60;
+static const int64_t MAX_FUTURE_BLOCK_TIME_MTP = 90 * 60 * 2;
 
 /**
  * Maximum amount of time that a block timestamp is allowed to be ahead of the
  * current network-adjusted time.
  */
-static const int64_t MAX_FUTURE_BLOCK_TIME_ADJUSTED = 2 * 60 * 60;
+static const int64_t MAX_FUTURE_BLOCK_TIME_ADJUSTED = 2 * 60 * 60 * 2;
 
 /**
  * Timestamp window used as a grace period by code that compares external
