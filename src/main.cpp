@@ -819,7 +819,7 @@ bool ContextualCheckTransaction(
         // Reject transactions with invalid version
         if (tx.fOverwintered && tx.nVersion < SAPLING_MIN_TX_VERSION ) {
             return state.DoS(
-                dosLevelConstricting,
+                dosLevelPotentiallyRelaxing,
                 error("CheckTransaction(): Sapling version too low"),
                 REJECT_INVALID, "bad-tx-sapling-version-too-low");
         }
@@ -835,7 +835,7 @@ bool ContextualCheckTransaction(
         // Reject transactions with valid version but missing overwinter flag
         if (tx.nVersion >= OVERWINTER_MIN_TX_VERSION && !tx.fOverwintered) {
             return state.DoS(
-                dosLevelConstricting,
+                dosLevelPotentiallyRelaxing,
                 error("ContextualCheckTransaction(): overwinter flag must be set"),
                 REJECT_INVALID, "tx-overwinter-flag-not-set");
         }
