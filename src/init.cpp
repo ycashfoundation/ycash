@@ -1656,6 +1656,9 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
             MilliSleep(10);
         }
     }
+    if (!fHaveGenesis) {
+        return false;
+    }
 
     // ********************************************************* Step 11: start node
 
