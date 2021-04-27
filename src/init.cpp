@@ -133,9 +133,21 @@ CClientUIInterface uiInterface; // Declared but not defined in ui_interface.h
 
 std::atomic<bool> fRequestShutdown(false);
 
+#ifdef WIN32
+/** On windows it is possible to simply use a condition variable. */
+std::mutex g_shutdown_mutex;
+std::condition_variable g_shutdown_cv;
+#endif
+
 void StartShutdown()
 {
+#ifdef WIN32
+    std::unique_lock<std::mutex> lk(g_shutdown_mutex);
     fRequestShutdown = true;
+    g_shutdown_cv.notify_one();
+#else
+    fRequestShutdown = true;
+#endif
 }
 bool ShutdownRequested()
 {
@@ -269,15 +281,35 @@ void Shutdown()
 /**
  * Signal handlers are very limited in what they are allowed to do, so:
  */
+#ifndef WIN32
 void HandleSIGTERM(int)
 {
-    fRequestShutdown = true;
+    StartShutdown();
 }
 
 void HandleSIGHUP(int)
 {
     fReopenDebugLog = true;
 }
+#else
+static BOOL WINAPI consoleCtrlHandler(DWORD dwCtrlType)
+{
+    StartShutdown();
+    Sleep(INFINITE);
+    return true;
+}
+#endif
+
+#ifndef WIN32
+static void registerSignalHandler(int signal, void(*handler)(int))
+{
+    struct sigaction sa;
+    sa.sa_handler = handler;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = 0;
+    sigaction(signal, &sa, nullptr);
+}
+#endif
 
 bool static InitError(const std::string &str)
 {
@@ -927,6 +959,8 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
 
     // Ignore SIGPIPE, otherwise it will bring the daemon down if the client closes unexpectedly
     signal(SIGPIPE, SIG_IGN);
+#else
+    SetConsoleCtrlHandler(consoleCtrlHandler, true);
 #endif
 
     std::set_new_handler(new_handler_terminate);
