@@ -4887,25 +4887,52 @@ bool CWallet::CreateTransaction(const vector<CRecipient>& vecSend, CWalletTx& wt
 
                     // coin control: send change to custom address
                     if (coinControl && !std::get_if<CNoDestination>(&coinControl->destChange))
+                    {
                         scriptChange = GetScriptForDestination(coinControl->destChange);
-
-                    // no coin control: send change to newly generated address
+                    }
                     else
                     {
-                        // Note: We use a new key here to keep it from being obvious which side is the change.
-                        //  The drawback is that by not reusing a previous key, the change may be lost if a
-                        //  backup is restored, if the backup doesn't have the new private key for the change.
-                        //  If we reused the old key, it would be possible to add code to look for and
-                        //  rediscover unknown transactions that were written with keys of ours to recover
-                        //  post-backup change.
+                        // no coin control
+                        // should we send change back to one of fromtaddrs
+                        CTxDestination changeAddr = CNoDestination();
+                        if (GetBoolArg("-sendchangeback", DEFAULT_SEND_CHANGE_BACK))
+                        {
+                            CAmount nMaxOutValue = 0;
+                            for (std::pair<const CWalletTx*, unsigned int> pcoin : setCoins)
+                            {
+                                if (pcoin.first->vout[pcoin.second].nValue > nMaxOutValue)
+                                {
+                                    if (ExtractDestination(pcoin.first->vout[pcoin.second].scriptPubKey, changeAddr))
+                                    {
+                                        nMaxOutValue = pcoin.first->vout[pcoin.second].nValue;
+                                    }
+                                }
+                            }
 
-                        // Reserve a new key pair from key pool
-                        CPubKey vchPubKey;
-                        bool ret;
-                        ret = reservekey.GetReservedKey(vchPubKey);
-                        assert(ret); // should never fail, as we just unlocked
+                            if (!std::get_if<CNoDestination>(&changeAddr))
+                            {
+                                scriptChange = GetScriptForDestination(changeAddr);
+                            }
+                        }
 
-                        scriptChange = GetScriptForDestination(vchPubKey.GetID());
+                        // no coin control and no -sendchangeback: send change to newly generated address
+                        if (std::get_if<CNoDestination>(&changeAddr))
+                        {
+                            // Note: We use a new key here to keep it from being obvious which side is the change.
+                            //  The drawback is that by not reusing a previous key, the change may be lost if a
+                            //  backup is restored, if the backup doesn't have the new private key for the change.
+                            //  If we reused the old key, it would be possible to add code to look for and
+                            //  rediscover unknown transactions that were written with keys of ours to recover
+                            //  post-backup change.
+
+                            // Reserve a new key pair from key pool
+                            CPubKey vchPubKey;
+                            bool ret;
+                            ret = reservekey.GetReservedKey(vchPubKey);
+                            assert(ret); // should never fail, as we just unlocked
+
+                            scriptChange = GetScriptForDestination(vchPubKey.GetID());
+                        }
                     }
 
                     CTxOut newTxOut(nChange, scriptChange);
@@ -5858,6 +5885,7 @@ std::string CWallet::GetWalletHelpString(bool showDebug)
                                                             CURRENCY_UNIT, FormatMoney(payTxFee.GetFeePerK())));
     strUsage += HelpMessageOpt("-rescan", _("Rescan the block chain for missing wallet transactions on startup"));
     strUsage += HelpMessageOpt("-salvagewallet", _("Attempt to recover private keys from a corrupt wallet on startup"));
+    strUsage += HelpMessageOpt("-sendchangeback", strprintf(_("Send change back to from t address if possible (default: %u)"), DEFAULT_SEND_CHANGE_BACK));
     strUsage += HelpMessageOpt("-sendfreetransactions", strprintf(_("Send transactions as zero-fee transactions if possible (default: %u)"), DEFAULT_SEND_FREE_TRANSACTIONS));
     strUsage += HelpMessageOpt("-spendzeroconfchange", strprintf(_("Spend unconfirmed change when sending transactions (default: %u)"), DEFAULT_SPEND_ZEROCONF_CHANGE));
     strUsage += HelpMessageOpt("-txconfirmtarget=<n>", strprintf(_("If paytxfee is not set, include enough fee so transactions begin confirmation on average within n blocks (default: %u)"), DEFAULT_TX_CONFIRM_TARGET));

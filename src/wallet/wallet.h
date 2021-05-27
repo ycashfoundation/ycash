@@ -66,6 +66,8 @@ static const CAmount DEFAULT_TRANSACTION_MINFEE = 1000;
 static const CAmount MIN_CHANGE = CENT;
 //! Default for -spendzeroconfchange
 static const bool DEFAULT_SPEND_ZEROCONF_CHANGE = true;
+//! Default for -sendchangeback
+static const bool DEFAULT_SEND_CHANGE_BACK = false;
 //! Default for -sendfreetransactions
 static const bool DEFAULT_SEND_FREE_TRANSACTIONS = false;
 //! -txconfirmtarget default
