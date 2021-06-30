@@ -5,8 +5,9 @@
 #ifndef ZCASH_DEPRECATION_H
 #define ZCASH_DEPRECATION_H
 
+#include "consensus/params.h"
 // Deprecation policy:
-// * Shut down 16 weeks' worth of blocks after the estimated release block height.
+// * Shut down 60 weeks' worth of blocks after the estimated release block height.
 // * A warning is shown during the 2 weeks' worth of blocks prior to shut down.
 static const int APPROX_RELEASE_HEIGHT = 810000;
 static const int WEEKS_UNTIL_DEPRECATION = 60;

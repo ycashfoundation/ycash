@@ -1,15 +1,12 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # Copyright (c) 2018 The Zcash developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or https://www.opensource.org/licenses/mit-license.php .
 
-import sys; assert sys.version_info < (3,), ur"This script does not run under Python 3. Please use Python 2.7.x."
-
 from test_framework.mininode import NodeConn, NetworkThread, \
     msg_tx, SAPLING_PROTO_VERSION
 from test_framework.test_framework import BitcoinTestFramework
-from test_framework.util import initialize_chain_clean, start_nodes, \
-    p2p_port, assert_equal
+from test_framework.util import start_nodes, p2p_port, assert_equal
 from tx_expiry_helper import TestNode, create_transaction
 
 import time
@@ -17,12 +14,13 @@ import time
 
 class TxExpiryDoSTest(BitcoinTestFramework):
 
-    def setup_chain(self):
-        print "Initializing test directory " + self.options.tmpdir
-        initialize_chain_clean(self.options.tmpdir, 1)
+    def __init__(self):
+        super().__init__()
+        self.num_nodes = 1
+        self.setup_clean_chain = True
 
     def setup_network(self):
-        self.nodes = start_nodes(1, self.options.tmpdir)
+        self.nodes = start_nodes(self.num_nodes, self.options.tmpdir)
 
     def run_test(self):
         test_node = TestNode()

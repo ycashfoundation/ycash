@@ -1,4 +1,4 @@
-Ycash v2.1.1-5
+Ycash v4.4.1
 <img align="right" width="120" height="80" src="https://www.ycash.xyz/y_sign.png">
 
 What is Ycash?
@@ -49,7 +49,9 @@ Build Ycash along with most dependencies from source by running:
 ./zcutil/build.sh -j$(nproc)
 ```
 
-Currently, Zcash is only officially supported on Debian and Ubuntu.
+Currently, Zcash is only officially supported on Debian and Ubuntu. See the
+[Debian / Ubuntu build](https://zcash.readthedocs.io/en/latest/rtd_pages/Debian-Ubuntu-build.html)
+for detailed instructions.
 
 License
 -------

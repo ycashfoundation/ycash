@@ -1,15 +1,17 @@
 // Copyright (c) 2019 The Zcash developers
 // Distributed under the MIT software license, see the accompanying
-// file COPYING or https://www.opensource.org/licenses/mit-license.php 
+// file COPYING or https://www.opensource.org/licenses/mit-license.php .
+
+#include "mempool_limit.h"
 
 #include "core_memusage.h"
-#include "mempool_limit.h"
+#include "logging.h"
 #include "random.h"
 #include "serialize.h"
 #include "timedata.h"
+#include "utiltime.h"
 #include "version.h"
 
-const CAmount DEFAULT_FEE = 10000;
 const TxWeight ZERO_WEIGHT = TxWeight(0, 0);
 
 void RecentlyEvictedList::pruneList()
@@ -17,7 +19,7 @@ void RecentlyEvictedList::pruneList()
     if (txIdSet.empty()) {
         return;
     }
-    int64_t now = GetAdjustedTime();
+    int64_t now = GetTime();
     while (txIdsAndTimes.size() > 0 && now - txIdsAndTimes.front().second > timeToKeep) {
         txIdSet.erase(txIdsAndTimes.front().first);
         txIdsAndTimes.pop_front();
@@ -31,7 +33,7 @@ void RecentlyEvictedList::add(const uint256& txId)
         txIdSet.erase(txIdsAndTimes.front().first);
         txIdsAndTimes.pop_front();
     }
-    txIdsAndTimes.push_back(std::make_pair(txId, GetAdjustedTime()));
+    txIdsAndTimes.push_back(std::make_pair(txId, GetTime()));
     txIdSet.insert(txId);
 }
 
@@ -118,11 +120,11 @@ void WeightedTxTree::remove(const uint256& txId)
     childWeights.pop_back();
 }
 
-boost::optional<uint256> WeightedTxTree::maybeDropRandom()
+std::optional<uint256> WeightedTxTree::maybeDropRandom()
 {
     TxWeight totalTxWeight = getTotalWeight();
     if (totalTxWeight.cost <= capacity) {
-        return boost::none;
+        return std::nullopt;
     }
     LogPrint("mempool", "Mempool cost limit exceeded (cost=%d, limit=%d)\n", totalTxWeight.cost, capacity);
     int randomWeight = GetRand(totalTxWeight.evictionWeight);
@@ -148,9 +150,6 @@ TxWeight TxWeight::negate() const
 WeightedTxInfo WeightedTxInfo::from(const CTransaction& tx, const CAmount& fee)
 {
     size_t memUsage = RecursiveDynamicUsage(tx);
-    memUsage += tx.vJoinSplit.size() * JOINSPLIT_SIZE;
-    memUsage += tx.vShieldedOutput.size() * OUTPUTDESCRIPTION_SIZE;
-    memUsage += tx.vShieldedSpend.size() * SPENDDESCRIPTION_SIZE;
     int64_t cost = std::max((int64_t) memUsage, (int64_t) MIN_TX_COST);
     int64_t evictionWeight = cost;
     if (fee < DEFAULT_FEE) {

@@ -11,6 +11,7 @@
 #include "amount.h"
 #include "chainparams.h"
 #include "consensus/consensus.h"
+#include "consensus/funding.h"
 #include "consensus/upgrades.h"
 #include "consensus/validation.h"
 #ifdef ENABLE_MINING
@@ -21,17 +22,19 @@
 #include "main.h"
 #include "metrics.h"
 #include "net.h"
+#include "zcash/Note.hpp"
 #include "policy/policy.h"
 #include "pow.h"
 #include "primitives/transaction.h"
 #include "random.h"
 #include "timedata.h"
+#include "transaction_builder.h"
 #include "ui_interface.h"
 #include "util.h"
 #include "utilmoneystr.h"
 #include "validationinterface.h"
 
-#include "sodium.h"
+#include <librustzcash.h>
 
 #include <boost/thread.hpp>
 #include <boost/tuple/tuple.hpp>
@@ -100,21 +103,209 @@ public:
 void UpdateTime(CBlockHeader* pblock, const Consensus::Params& consensusParams, const CBlockIndex* pindexPrev)
 {
     auto medianTimePast = pindexPrev->GetMedianTimePast();
-    auto nTime = std::max(medianTimePast + 1, GetAdjustedTime());
+    auto nTime = std::max(medianTimePast + 1, GetTime());
     // See the comment in ContextualCheckBlockHeader() for background.
     if (consensusParams.FutureTimestampSoftForkActive(pindexPrev->nHeight + 1)) {
         nTime = std::min(nTime, medianTimePast + MAX_FUTURE_BLOCK_TIME_MTP);
     }
     pblock->nTime = nTime;
 
-    // Updating time can change work required on testnet or at ycash mainnet fork
-    if (consensusParams.nPowAllowMinDifficultyBlocksAfterHeight != boost::none || 
-        consensusParams.scaledDifficultyAtYcashFork) {
+    // Updating time can change work required on testnet:
+    if (consensusParams.nPowAllowMinDifficultyBlocksAfterHeight != std::nullopt) {
         pblock->nBits = GetNextWorkRequired(pindexPrev, pblock, consensusParams);
     }
 }
 
-CBlockTemplate* CreateNewBlock(const CChainParams& chainparams, const CScript& scriptPubKeyIn)
+bool IsShieldedMinerAddress(const MinerAddress& minerAddr) {
+    return !(
+        std::holds_alternative<InvalidMinerAddress>(minerAddr) ||
+        std::holds_alternative<boost::shared_ptr<CReserveScript>>(minerAddr));
+}
+
+class AddFundingStreamValueToTx
+{
+private:
+    CMutableTransaction &mtx;
+    void* ctx; 
+    const CAmount fundingStreamValue;
+    const libzcash::Zip212Enabled zip212Enabled;
+public:
+    AddFundingStreamValueToTx(
+            CMutableTransaction &mtx, 
+            void* ctx, 
+            const CAmount fundingStreamValue,
+            const libzcash::Zip212Enabled zip212Enabled): mtx(mtx), ctx(ctx), fundingStreamValue(fundingStreamValue), zip212Enabled(zip212Enabled) {}
+
+    bool operator()(const libzcash::SaplingPaymentAddress& pa) const {
+        uint256 ovk;
+        auto note = libzcash::SaplingNote(pa, fundingStreamValue, zip212Enabled);
+        auto output = OutputDescriptionInfo(ovk, note, NO_MEMO);
+
+        auto odesc = output.Build(ctx);
+        if (odesc) {
+            mtx.vShieldedOutput.push_back(odesc.value());
+            mtx.valueBalance -= fundingStreamValue;
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    bool operator()(const CScript& scriptPubKey) const {
+        mtx.vout.push_back(CTxOut(fundingStreamValue, scriptPubKey));
+        return true;
+    }
+};
+
+
+class AddOutputsToCoinbaseTxAndSign
+{
+private:
+    CMutableTransaction &mtx;
+    const CChainParams &chainparams;
+    const int nHeight;
+    const CAmount nFees;
+
+public:
+    AddOutputsToCoinbaseTxAndSign(
+        CMutableTransaction &mtx,
+        const CChainParams &chainparams,
+        const int nHeight,
+        const CAmount nFees) : mtx(mtx), chainparams(chainparams), nHeight(nHeight), nFees(nFees) {}
+
+    const libzcash::Zip212Enabled GetZip212Flag() const {
+        if (chainparams.GetConsensus().NetworkUpgradeActive(nHeight, Consensus::UPGRADE_CANOPY)) {
+            return libzcash::Zip212Enabled::AfterZip212;
+        } else {
+            return libzcash::Zip212Enabled::BeforeZip212;
+        }
+    }
+
+    CAmount SetFoundersRewardAndGetMinerValue(void* ctx) const {
+        auto block_subsidy = GetBlockSubsidy(nHeight, chainparams.GetConsensus());
+        auto miner_reward = block_subsidy; // founders' reward or funding stream amounts will be subtracted below
+
+        if (nHeight > 0) {
+            if (chainparams.GetConsensus().NetworkUpgradeActive(nHeight, Consensus::UPGRADE_CANOPY)) {
+                auto fundingStreamElements = Consensus::GetActiveFundingStreamElements(
+                    nHeight,
+                    block_subsidy,
+                    chainparams.GetConsensus());
+
+                for (Consensus::FundingStreamElement fselem : fundingStreamElements) {
+                    miner_reward -= fselem.second;
+                    bool added = std::visit(AddFundingStreamValueToTx(mtx, ctx, fselem.second, GetZip212Flag()), fselem.first);
+                    if (!added) {
+                        librustzcash_sapling_proving_ctx_free(ctx);
+                        throw new std::runtime_error("Failed to add funding stream output.");
+                    }
+                }
+            } else if (nHeight <= chainparams.GetConsensus().GetLastFoundersRewardBlockHeight(nHeight)) {
+                // Founders reward is 20% of the block subsidy
+                auto vFoundersReward = miner_reward / 5;
+                // Take some reward away from us
+                miner_reward -= vFoundersReward;
+                // And give it to the founders
+                mtx.vout.push_back(CTxOut(vFoundersReward, chainparams.GetFoundersRewardScriptAtHeight(nHeight)));
+            } else {
+                // Founders reward ends without replacement if Canopy is not activated by the
+                // last Founders' Reward block height + 1.
+            }
+        }
+
+        return miner_reward + nFees;
+    }
+
+    void ComputeBindingSig(void* ctx) const {
+        // Empty output script.
+        uint256 dataToBeSigned;
+        CScript scriptCode;
+        try {
+            dataToBeSigned = SignatureHash(
+                scriptCode, mtx, NOT_AN_INPUT, SIGHASH_ALL, 0,
+                CurrentEpochBranchId(nHeight, chainparams.GetConsensus()));
+        } catch (std::logic_error ex) {
+            librustzcash_sapling_proving_ctx_free(ctx);
+            throw ex;
+        }
+
+        bool success = librustzcash_sapling_binding_sig(
+            ctx,
+            mtx.valueBalance,
+            dataToBeSigned.begin(),
+            mtx.bindingSig.data());
+
+        if (!success) {
+            librustzcash_sapling_proving_ctx_free(ctx);
+            throw new std::runtime_error("An error occurred computing the binding signature.");
+        }
+    }
+
+    void operator()(const InvalidMinerAddress &invalid) const {}
+
+    // Create shielded output
+    void operator()(const libzcash::SaplingPaymentAddress &pa) const {
+        auto ctx = librustzcash_sapling_proving_ctx_init();
+
+        auto miner_reward = SetFoundersRewardAndGetMinerValue(ctx);
+        mtx.valueBalance -= miner_reward;
+
+        uint256 ovk;
+
+        auto note = libzcash::SaplingNote(pa, miner_reward, GetZip212Flag());
+        auto output = OutputDescriptionInfo(ovk, note, NO_MEMO);
+
+        auto odesc = output.Build(ctx);
+        if (!odesc) {
+            librustzcash_sapling_proving_ctx_free(ctx);
+            throw new std::runtime_error("Failed to create shielded output for miner");
+        }
+        mtx.vShieldedOutput.push_back(odesc.value());
+
+        ComputeBindingSig(ctx);
+
+        librustzcash_sapling_proving_ctx_free(ctx);
+    }
+
+    // Create transparent output
+    void operator()(const boost::shared_ptr<CReserveScript> &coinbaseScript) const {
+        // Add the FR output and fetch the miner's output value.
+        auto ctx = librustzcash_sapling_proving_ctx_init();
+
+        // Miner output will be vout[0]; Founders' Reward & funding stream outputs
+        // will follow.
+        mtx.vout.resize(1);
+        auto value = SetFoundersRewardAndGetMinerValue(ctx);
+
+        // Now fill in the miner's output.
+        mtx.vout[0] = CTxOut(value, coinbaseScript->reserveScript);
+
+        if (mtx.vShieldedOutput.size() > 0) {
+            ComputeBindingSig(ctx);
+        }
+
+        librustzcash_sapling_proving_ctx_free(ctx);
+    }
+};
+
+CMutableTransaction CreateCoinbaseTransaction(const CChainParams& chainparams, CAmount nFees, const MinerAddress& minerAddress, int nHeight)
+{
+        CMutableTransaction mtx = CreateNewContextualCMutableTransaction(chainparams.GetConsensus(), nHeight);
+        mtx.vin.resize(1);
+        mtx.vin[0].prevout.SetNull();
+        // Set to 0 so expiry height does not apply to coinbase txs
+        mtx.nExpiryHeight = 0;
+
+        // Add outputs and sign
+        std::visit(
+            AddOutputsToCoinbaseTxAndSign(mtx, chainparams, nHeight, nFees),
+            minerAddress);
+
+        mtx.vin[0].scriptSig = CScript() << nHeight << OP_0;
+        return mtx;
+}
+
+CBlockTemplate* CreateNewBlock(const CChainParams& chainparams, const MinerAddress& minerAddress, const std::optional<CMutableTransaction>& next_cb_mtx)
 {
     // Create new block
     std::unique_ptr<CBlockTemplate> pblocktemplate(new CBlockTemplate());
@@ -155,7 +346,7 @@ CBlockTemplate* CreateNewBlock(const CChainParams& chainparams, const CScript& s
         CBlockIndex* pindexPrev = chainActive.Tip();
         const int nHeight = pindexPrev->nHeight + 1;
         uint32_t consensusBranchId = CurrentEpochBranchId(nHeight, chainparams.GetConsensus());
-        pblock->nTime = GetAdjustedTime();
+        pblock->nTime = GetTime();
         const int64_t nMedianTimePast = pindexPrev->GetMedianTimePast();
         CCoinsViewCache view(pcoinsTip);
 
@@ -170,82 +361,87 @@ CBlockTemplate* CreateNewBlock(const CChainParams& chainparams, const CScript& s
         // This vector will be sorted into a priority queue:
         vector<TxPriority> vecPriority;
         vecPriority.reserve(mempool.mapTx.size());
-        for (CTxMemPool::indexed_transaction_set::iterator mi = mempool.mapTx.begin();
-             mi != mempool.mapTx.end(); ++mi)
-        {
-            const CTransaction& tx = mi->GetTx();
 
-            int64_t nLockTimeCutoff = (STANDARD_LOCKTIME_VERIFY_FLAGS & LOCKTIME_MEDIAN_TIME_PAST)
-                                    ? nMedianTimePast
-                                    : pblock->GetBlockTime();
-
-            if (tx.IsCoinBase() || !IsFinalTx(tx, nHeight, nLockTimeCutoff) || IsExpiredTx(tx, nHeight))
-                continue;
-
-            COrphan* porphan = NULL;
-            double dPriority = 0;
-            CAmount nTotalIn = 0;
-            bool fMissingInputs = false;
-            BOOST_FOREACH(const CTxIn& txin, tx.vin)
+        // If we're given a coinbase tx, it's been precomputed, its fees are zero,
+        // so we can't include any mempool transactions; this will be an empty block.
+        if (!next_cb_mtx) {
+            for (CTxMemPool::indexed_transaction_set::iterator mi = mempool.mapTx.begin();
+                mi != mempool.mapTx.end(); ++mi)
             {
-                // Read prev transaction
-                if (!view.HaveCoins(txin.prevout.hash))
-                {
-                    // This should never happen; all transactions in the memory
-                    // pool should connect to either transactions in the chain
-                    // or other transactions in the memory pool.
-                    if (!mempool.mapTx.count(txin.prevout.hash))
-                    {
-                        LogPrintf("ERROR: mempool transaction missing input\n");
-                        if (fDebug) assert("mempool transaction missing input" == 0);
-                        fMissingInputs = true;
-                        if (porphan)
-                            vOrphan.pop_back();
-                        break;
-                    }
+                const CTransaction& tx = mi->GetTx();
 
-                    // Has to wait for dependencies
-                    if (!porphan)
-                    {
-                        // Use list for automatic deletion
-                        vOrphan.push_back(COrphan(&tx));
-                        porphan = &vOrphan.back();
-                    }
-                    mapDependers[txin.prevout.hash].push_back(porphan);
-                    porphan->setDependsOn.insert(txin.prevout.hash);
-                    nTotalIn += mempool.mapTx.find(txin.prevout.hash)->GetTx().vout[txin.prevout.n].nValue;
+                int64_t nLockTimeCutoff = (STANDARD_LOCKTIME_VERIFY_FLAGS & LOCKTIME_MEDIAN_TIME_PAST)
+                                        ? nMedianTimePast
+                                        : pblock->GetBlockTime();
+
+                if (tx.IsCoinBase() || !IsFinalTx(tx, nHeight, nLockTimeCutoff) || IsExpiredTx(tx, nHeight))
                     continue;
+
+                COrphan* porphan = NULL;
+                double dPriority = 0;
+                CAmount nTotalIn = 0;
+                bool fMissingInputs = false;
+                for (const CTxIn& txin : tx.vin)
+                {
+                    // Read prev transaction
+                    if (!view.HaveCoins(txin.prevout.hash))
+                    {
+                        // This should never happen; all transactions in the memory
+                        // pool should connect to either transactions in the chain
+                        // or other transactions in the memory pool.
+                        if (!mempool.mapTx.count(txin.prevout.hash))
+                        {
+                            LogPrintf("ERROR: mempool transaction missing input\n");
+                            if (fDebug) assert("mempool transaction missing input" == 0);
+                            fMissingInputs = true;
+                            if (porphan)
+                                vOrphan.pop_back();
+                            break;
+                        }
+
+                        // Has to wait for dependencies
+                        if (!porphan)
+                        {
+                            // Use list for automatic deletion
+                            vOrphan.push_back(COrphan(&tx));
+                            porphan = &vOrphan.back();
+                        }
+                        mapDependers[txin.prevout.hash].push_back(porphan);
+                        porphan->setDependsOn.insert(txin.prevout.hash);
+                        nTotalIn += mempool.mapTx.find(txin.prevout.hash)->GetTx().vout[txin.prevout.n].nValue;
+                        continue;
+                    }
+                    const CCoins* coins = view.AccessCoins(txin.prevout.hash);
+                    assert(coins);
+
+                    CAmount nValueIn = coins->vout[txin.prevout.n].nValue;
+                    nTotalIn += nValueIn;
+
+                    int nConf = nHeight - coins->nHeight;
+
+                    dPriority += (double)nValueIn * nConf;
                 }
-                const CCoins* coins = view.AccessCoins(txin.prevout.hash);
-                assert(coins);
+                nTotalIn += tx.GetShieldedValueIn();
 
-                CAmount nValueIn = coins->vout[txin.prevout.n].nValue;
-                nTotalIn += nValueIn;
+                if (fMissingInputs) continue;
 
-                int nConf = nHeight - coins->nHeight;
+                // Priority is sum(valuein * age) / modified_txsize
+                unsigned int nTxSize = ::GetSerializeSize(tx, SER_NETWORK, PROTOCOL_VERSION);
+                dPriority = tx.ComputePriority(dPriority, nTxSize);
 
-                dPriority += (double)nValueIn * nConf;
+                uint256 hash = tx.GetHash();
+                mempool.ApplyDeltas(hash, dPriority, nTotalIn);
+
+                CFeeRate feeRate(nTotalIn-tx.GetValueOut(), nTxSize);
+
+                if (porphan)
+                {
+                    porphan->dPriority = dPriority;
+                    porphan->feeRate = feeRate;
+                }
+                else
+                    vecPriority.push_back(TxPriority(dPriority, feeRate, &(mi->GetTx())));
             }
-            nTotalIn += tx.GetShieldedValueIn();
-
-            if (fMissingInputs) continue;
-
-            // Priority is sum(valuein * age) / modified_txsize
-            unsigned int nTxSize = ::GetSerializeSize(tx, SER_NETWORK, PROTOCOL_VERSION);
-            dPriority = tx.ComputePriority(dPriority, nTxSize);
-
-            uint256 hash = tx.GetHash();
-            mempool.ApplyDeltas(hash, dPriority, nTotalIn);
-
-            CFeeRate feeRate(nTotalIn-tx.GetValueOut(), nTxSize);
-
-            if (porphan)
-            {
-                porphan->dPriority = dPriority;
-                porphan->feeRate = feeRate;
-            }
-            else
-                vecPriority.push_back(TxPriority(dPriority, feeRate, &(mi->GetTx())));
         }
 
         // Collect transactions into block
@@ -362,10 +558,6 @@ CBlockTemplate* CreateNewBlock(const CChainParams& chainparams, const CScript& s
 
             UpdateCoins(tx, view, nHeight);
 
-            BOOST_FOREACH(const OutputDescription &outDescription, tx.vShieldedOutput) {
-                sapling_tree.append(outDescription.cm);
-            }
-
             // Added
             pblock->vtx.push_back(tx);
             pblocktemplate->vTxFees.push_back(nTxFees);
@@ -384,7 +576,7 @@ CBlockTemplate* CreateNewBlock(const CChainParams& chainparams, const CScript& s
             // Add transactions that depend on this one to the priority queue
             if (mapDependers.count(hash))
             {
-                BOOST_FOREACH(COrphan* porphan, mapDependers[hash])
+                for (COrphan* porphan : mapDependers[hash])
                 {
                     if (!porphan->setDependsOn.empty())
                     {
@@ -404,42 +596,19 @@ CBlockTemplate* CreateNewBlock(const CChainParams& chainparams, const CScript& s
         LogPrintf("CreateNewBlock(): total size %u\n", nBlockSize);
 
         // Create coinbase tx
-        CMutableTransaction txNew = CreateNewContextualCMutableTransaction(chainparams.GetConsensus(), nHeight);
-        txNew.vin.resize(1);
-        txNew.vin[0].prevout.SetNull();
-        txNew.vout.resize(1);
-        txNew.vout[0].scriptPubKey = scriptPubKeyIn;
-        txNew.vout[0].nValue = GetBlockSubsidy(nHeight, chainparams.GetConsensus());
-        // Set to 0 so expiry height does not apply to coinbase txs
-        txNew.nExpiryHeight = 0;
-
-        const Consensus::Params& consensusParams = Params().GetConsensus();
-        if (CurrentEpoch(nHeight, consensusParams) < Consensus::UPGRADE_YCASH) {
-            if ((nHeight > 0) && (nHeight <= chainparams.GetConsensus().GetLastFoundersRewardBlockHeight(nHeight))) {
-                // Founders reward is 20% of the block subsidy
-                auto vFoundersReward = txNew.vout[0].nValue / 5;
-                // Take some reward away from us
-                txNew.vout[0].nValue -= vFoundersReward;
-
-                // And give it to the founders
-                txNew.vout.push_back(CTxOut(vFoundersReward, chainparams.GetFoundersRewardScriptAtHeight(nHeight)));
-            }
+        if (next_cb_mtx) {
+            pblock->vtx[0] = *next_cb_mtx;
         } else {
-            // Founders reward is 5% of the block subsidy after YCash
-            auto vFoundersReward = txNew.vout[0].nValue / 20;
-            // Take some reward away from us
-            txNew.vout[0].nValue -= vFoundersReward;
-
-            // And give it to the founders
-            txNew.vout.push_back(CTxOut(vFoundersReward, chainparams.GetFoundersRewardScriptAtHeight(nHeight)));
+            pblock->vtx[0] = CreateCoinbaseTransaction(chainparams, nFees, minerAddress, nHeight);
         }
-
-        // Add fees
-        txNew.vout[0].nValue += nFees;
-        txNew.vin[0].scriptSig = CScript() << nHeight << OP_0;
-
-        pblock->vtx[0] = txNew;
         pblocktemplate->vTxFees[0] = -nFees;
+
+        // Update the Sapling commitment tree.
+        for (const CTransaction& tx : pblock->vtx) {
+            for (const OutputDescription& odesc : tx.vShieldedOutput) {
+                sapling_tree.append(odesc.cmu);
+            }
+        }
 
         // Randomise nonce
         arith_uint256 nonce = UintToArith256(GetRandHash());
@@ -448,17 +617,25 @@ CBlockTemplate* CreateNewBlock(const CChainParams& chainparams, const CScript& s
         nonce >>= 16;
         pblock->nNonce = ArithToUint256(nonce);
 
+        uint32_t prevConsensusBranchId = CurrentEpochBranchId(pindexPrev->nHeight, chainparams.GetConsensus());
+
         // Fill in header
         pblock->hashPrevBlock  = pindexPrev->GetBlockHash();
-        pblock->hashFinalSaplingRoot   = sapling_tree.root();
+        if (IsActivationHeight(nHeight, chainparams.GetConsensus(), Consensus::UPGRADE_HEARTWOOD)) {
+            pblock->hashLightClientRoot.SetNull();
+        } else if (chainparams.GetConsensus().NetworkUpgradeActive(nHeight, Consensus::UPGRADE_HEARTWOOD)) {
+            pblock->hashLightClientRoot = view.GetHistoryRoot(prevConsensusBranchId);
+        } else {
+            pblock->hashLightClientRoot = sapling_tree.root();
+        }
         UpdateTime(pblock, chainparams.GetConsensus(), pindexPrev);
         pblock->nBits          = GetNextWorkRequired(pindexPrev, pblock, chainparams.GetConsensus());
         pblock->nSolution.clear();
         pblocktemplate->vTxSigOps[0] = GetLegacySigOpCount(pblock->vtx[0]);
 
         CValidationState state;
-        if (!TestBlockValidity(state, chainparams, *pblock, pindexPrev, false, false))
-            throw std::runtime_error("CreateNewBlock(): TestBlockValidity failed");
+        if (!TestBlockValidity(state, chainparams, *pblock, pindexPrev, false))
+            throw std::runtime_error(std::string("CreateNewBlock(): TestBlockValidity failed: ") + state.GetRejectReason());
     }
 
     return pblocktemplate.release();
@@ -481,18 +658,28 @@ class MinerAddressScript : public CReserveScript
     void KeepScript() {}
 };
 
-void GetScriptForMinerAddress(boost::shared_ptr<CReserveScript> &script)
+void GetMinerAddress(MinerAddress &minerAddress)
 {
-    CTxDestination addr = DecodeDestination(GetArg("-mineraddress", ""));
-    if (!IsValidDestination(addr)) {
-        return;
+    KeyIO keyIO(Params());
+
+    // Try a transparent address first
+    auto mAddrArg = GetArg("-mineraddress", "");
+    CTxDestination addr = keyIO.DecodeDestination(mAddrArg);
+    if (IsValidDestination(addr)) {
+        boost::shared_ptr<MinerAddressScript> mAddr(new MinerAddressScript());
+        CKeyID keyID = std::get<CKeyID>(addr);
+
+        mAddr->reserveScript = CScript() << OP_DUP << OP_HASH160 << ToByteVector(keyID) << OP_EQUALVERIFY << OP_CHECKSIG;
+        minerAddress = mAddr;
+    } else {
+        // Try a Sapling address
+        auto zaddr = keyIO.DecodePaymentAddress(mAddrArg);
+        if (IsValidPaymentAddress(zaddr)) {
+            if (std::get_if<libzcash::SaplingPaymentAddress>(&zaddr) != nullptr) {
+                minerAddress = std::get<libzcash::SaplingPaymentAddress>(zaddr);
+            }
+        }
     }
-
-    boost::shared_ptr<MinerAddressScript> mAddr(new MinerAddressScript());
-    CKeyID keyID = boost::get<CKeyID>(addr);
-
-    script = mAddr;
-    script->reserveScript = CScript() << OP_DUP << OP_HASH160 << ToByteVector(keyID) << OP_EQUALVERIFY << OP_CHECKSIG;
 }
 
 void IncrementExtraNonce(CBlock* pblock, const CBlockIndex* pindexPrev, unsigned int& nExtraNonce)
@@ -548,8 +735,8 @@ void static BitcoinMiner(const CChainParams& chainparams)
     // Each thread has its own counter
     unsigned int nExtraNonce = 0;
 
-    boost::shared_ptr<CReserveScript> coinbaseScript;
-    GetMainSignals().ScriptForMining(coinbaseScript);
+    MinerAddress minerAddress;
+    GetMainSignals().AddressForMining(minerAddress);
 
     unsigned int n = chainparams.GetConsensus().nEquihashN;
     unsigned int k = chainparams.GetConsensus().nEquihashK;
@@ -561,7 +748,7 @@ void static BitcoinMiner(const CChainParams& chainparams)
     std::mutex m_cs;
     bool cancelSolver = false;
     boost::signals2::connection c = uiInterface.NotifyBlockTip.connect(
-        [&m_cs, &cancelSolver](const uint256& hashNewTip) mutable {
+        [&m_cs, &cancelSolver](bool, const CBlockIndex *) mutable {
             std::lock_guard<std::mutex> lock{m_cs};
             cancelSolver = true;
         }
@@ -569,9 +756,10 @@ void static BitcoinMiner(const CChainParams& chainparams)
     miningTimer.start();
 
     try {
-        //throw an error if no script was provided
-        if (!coinbaseScript->reserveScript.size())
-            throw std::runtime_error("No coinbase script available (mining requires a wallet or -mineraddress)");
+        // Throw an error if no address valid for mining was provided.
+        if (!std::visit(IsValidMinerAddress(), minerAddress)) {
+            throw std::runtime_error("No miner address available (mining requires a wallet or -mineraddress)");
+        }
 
         while (true) {
             if (chainparams.MiningRequiresPeers()) {
@@ -584,7 +772,7 @@ void static BitcoinMiner(const CChainParams& chainparams)
                         LOCK(cs_vNodes);
                         fvNodesEmpty = vNodes.empty();
                     }
-                    if (!fvNodesEmpty && !IsInitialBlockDownload(chainparams))
+                    if (!fvNodesEmpty && !IsInitialBlockDownload(chainparams.GetConsensus()))
                         break;
                     MilliSleep(1000);
                 } while (true);
@@ -609,7 +797,7 @@ void static BitcoinMiner(const CChainParams& chainparams)
             unsigned int k = chainparams.EquihashK(nHeight + 1);
             LogPrint("pow", "Using Equihash solver \"%s\" with n = %u, k = %u\n", solver, n, k);
 
-            unique_ptr<CBlockTemplate> pblocktemplate(CreateNewBlock(chainparams, coinbaseScript->reserveScript));
+            unique_ptr<CBlockTemplate> pblocktemplate(CreateNewBlock(chainparams, minerAddress));
             if (!pblocktemplate.get())
             {
                 if (GetArg("-mineraddress", "").empty()) {
@@ -634,7 +822,7 @@ void static BitcoinMiner(const CChainParams& chainparams)
 
             while (true) {
                 // Hash state
-                crypto_generichash_blake2b_state state;
+                eh_HashState state;
                 EhInitialiseState(n, k, state);
 
                 // I = the block header minus nonce and solution.
@@ -643,21 +831,19 @@ void static BitcoinMiner(const CChainParams& chainparams)
                 ss << I;
 
                 // H(I||...
-                crypto_generichash_blake2b_update(&state, (unsigned char*)&ss[0], ss.size());
+                state.Update((unsigned char*)&ss[0], ss.size());
 
                 // H(I||V||...
-                crypto_generichash_blake2b_state curr_state;
+                eh_HashState curr_state;
                 curr_state = state;
-                crypto_generichash_blake2b_update(&curr_state,
-                                                  pblock->nNonce.begin(),
-                                                  pblock->nNonce.size());
+                curr_state.Update(pblock->nNonce.begin(), pblock->nNonce.size());
 
                 // (x_1, x_2, ...) = A(I, V, n, k)
                 LogPrint("pow", "Running Equihash solver \"%s\" with nNonce = %s\n",
                          solver, pblock->nNonce.ToString());
 
                 std::function<bool(std::vector<unsigned char>)> validBlock =
-                        [&pblock, &hashTarget, &chainparams, &m_cs, &cancelSolver, &coinbaseScript]
+                        [&pblock, &hashTarget, &chainparams, &m_cs, &cancelSolver, &minerAddress]
                         (std::vector<unsigned char> soln) {
                     // Write the solution to the hash and compute the result.
                     LogPrint("pow", "- Checking solution against target\n");
@@ -678,7 +864,7 @@ void static BitcoinMiner(const CChainParams& chainparams)
                         cancelSolver = false;
                     }
                     SetThreadPriority(THREAD_PRIORITY_LOWEST);
-                    coinbaseScript->KeepScript();
+                    std::visit(KeepMinerAddress(), minerAddress);
 
                     // In regression test mode, stop mining after a block is found.
                     if (chainparams.MineBlocksOnDemand()) {
@@ -698,7 +884,7 @@ void static BitcoinMiner(const CChainParams& chainparams)
                 if (solver == "tromp") {
                     // Create solver and initialize it.
                     equi eq(1);
-                    eq.setstate(&curr_state);
+                    eq.setstate(curr_state.inner.get());
 
                     // Initialization done, start algo driver.
                     eq.digit0(0);
@@ -757,8 +943,9 @@ void static BitcoinMiner(const CChainParams& chainparams)
                 // Update nNonce and nTime
                 pblock->nNonce = ArithToUint256(UintToArith256(pblock->nNonce) + 1);
                 UpdateTime(pblock, chainparams.GetConsensus(), pindexPrev);
-                if (chainparams.GetConsensus().nPowAllowMinDifficultyBlocksAfterHeight != boost::none ||
-                    chainparams.GetConsensus().scaledDifficultyAtYcashFork) {
+                if (chainparams.GetConsensus().nPowAllowMinDifficultyBlocksAfterHeight != std::nullopt ||
+                    chainparams.GetConsensus().scaledDifficultyAtYcashFork)
+                {
                     // Changing pblock->nTime can change work required on testnet or ycash mainnet fork block:
                     hashTarget.SetCompact(pblock->nBits);
                 }

@@ -1,37 +1,37 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # Copyright (c) 2017 The Zcash developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or https://www.opensource.org/licenses/mit-license.php .
 
-import sys; assert sys.version_info < (3,), ur"This script does not run under Python 3. Please use Python 2.7.x."
-
 from decimal import Decimal
+from functools import reduce
 from test_framework.test_framework import BitcoinTestFramework
-from test_framework.util import assert_equal, assert_greater_than, start_nodes, initialize_chain_clean, connect_nodes_bi
+from test_framework.util import assert_equal, assert_greater_than, start_nodes, connect_nodes_bi
 
 import logging
+import sys
 
-logging.basicConfig(format='%(levelname)s:%(message)s', level=logging.INFO)
+logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.INFO, stream=sys.stdout)
 
 
 class KeyImportExportTest (BitcoinTestFramework):
 
-    def setup_chain(self):
-        print("Initializing test directory "+self.options.tmpdir)
-        initialize_chain_clean(self.options.tmpdir, 5)
+    def __init__(self):
+        super().__init__()
+        self.num_nodes = 4
+        self.setup_clean_chain = True
 
     def setup_network(self, split=False):
-        self.nodes = start_nodes(5, self.options.tmpdir )
+        self.nodes = start_nodes(self.num_nodes, self.options.tmpdir )
         connect_nodes_bi(self.nodes,0,1)
         connect_nodes_bi(self.nodes,1,2)
         connect_nodes_bi(self.nodes,0,2)
         connect_nodes_bi(self.nodes,0,3)
-        connect_nodes_bi(self.nodes,0,4)
         self.is_network_split=False
         self.sync_all()
 
     def run_test(self):
-        [alice, bob, charlie, david, miner] = self.nodes
+        [alice, bob, charlie, miner] = self.nodes
 
         def alice_to_bob(amount):
             alice.sendtoaddress(addr, Decimal(amount))
@@ -41,11 +41,8 @@ class KeyImportExportTest (BitcoinTestFramework):
 
         def verify_utxos(node, amounts):
             utxos = node.listunspent(1, 10**9, [addr])
-
-            def cmp_confirmations_high_to_low(a, b):
-                return cmp(b["confirmations"], a["confirmations"])
-
-            utxos.sort(cmp_confirmations_high_to_low)
+            utxos.sort(key=lambda x: x["confirmations"])
+            utxos.reverse()
 
             try:
                 assert_equal(amounts, [utxo["amount"] for utxo in utxos])
@@ -67,7 +64,7 @@ class KeyImportExportTest (BitcoinTestFramework):
         verify_utxos(charlie, [])
 
         # the amounts of each txn embodied which generates a single UTXO:
-        amounts = map(Decimal, ['2.3', '3.7', '0.1', '0.5', '1.0', '0.19'])
+        amounts = list(map(Decimal, ['2.3', '3.7', '0.1', '0.5', '1.0', '0.19']))
 
         # Internal test consistency assertion:
         assert_greater_than(
@@ -102,42 +99,12 @@ class KeyImportExportTest (BitcoinTestFramework):
         # amounts should be unchanged
         verify_utxos(charlie, amounts[:4])
 
-        # importprivkey with rescan starting at a height before the Txns were sent
-        ipkaddr3 = charlie.importprivkey(privkey, '', True, 100)
-        assert_equal(addr, ipkaddr3)
-
-        # amounts should be unchanged
-        verify_utxos(charlie, amounts[:4])
-
-        # Import the priv key into the miner, starting at a block height before the Txns were sent
-        logging.info("Importing privkey into miner...")
-        ipkaddr4 = miner.importprivkey(privkey, '', True, 100)
-        assert_equal(addr, ipkaddr4)
-
-        # amounts should be unchanged
-        verify_utxos(miner, amounts[:4])
-
         logging.info("Sending post-import txns...")
         for amount in amounts[4:]:
             alice_to_bob(amount)
 
-        # The utxos should be in all 3 accounts, since the privkey was imported into all 3 of them
         verify_utxos(bob, amounts)
         verify_utxos(charlie, amounts)
-        verify_utxos(miner, amounts)
-
-        # Add the keys to david, but rescan from a block height higher than the Txns, which will make
-        # it so that david doesn't see the transactions
-        david_utxos = david.listunspent()
-        assert_equal(david.getrescaninfo()["rescanning"], False)
-
-        miner.generate(10)
-        self.sync_all()
-
-        ipkaddr5 = david.importprivkey(privkey, '', True, david.getinfo()["blocks"] - 5)
-        assert_equal(david.getrescaninfo()["rescanning"], False)
-        assert_equal(addr, ipkaddr5)
-        assert_equal([utxo["amount"] for utxo in david_utxos], [utxo["amount"] for utxo in david.listunspent()])
 
 
 if __name__ == '__main__':

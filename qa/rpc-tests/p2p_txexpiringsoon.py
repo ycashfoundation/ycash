@@ -1,29 +1,26 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # Copyright (c) 2018 The Zcash developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or https://www.opensource.org/licenses/mit-license.php .
-
-import sys; assert sys.version_info < (3,), ur"This script does not run under Python 3. Please use Python 2.7.x."
 
 from test_framework.authproxy import JSONRPCException
 from test_framework.mininode import NodeConn, NetworkThread, CInv, \
     msg_mempool, msg_getdata, msg_tx, mininode_lock, SAPLING_PROTO_VERSION
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import assert_equal, connect_nodes_bi, fail, \
-    initialize_chain_clean, p2p_port, start_nodes, sync_blocks, sync_mempools
+    p2p_port, start_nodes, sync_blocks, sync_mempools
 from tx_expiry_helper import TestNode, create_transaction
-
-from binascii import hexlify
 
 
 class TxExpiringSoonTest(BitcoinTestFramework):
 
-    def setup_chain(self):
-        print "Initializing test directory " + self.options.tmpdir
-        initialize_chain_clean(self.options.tmpdir, 3)
+    def __init__(self):
+        super().__init__()
+        self.num_nodes = 3
+        self.setup_clean_chain = True
 
     def setup_network(self):
-        self.nodes = start_nodes(3, self.options.tmpdir)
+        self.nodes = start_nodes(self.num_nodes, self.options.tmpdir)
         connect_nodes_bi(self.nodes, 0, 1)
         # We don't connect node 2
 
@@ -165,7 +162,7 @@ class TxExpiringSoonTest(BitcoinTestFramework):
 
         # Confirm tx2 cannot be submitted to a mempool because it is expiring soon.
         try:
-            rawtx2 = hexlify(tx2.serialize())
+            rawtx2 = tx2.serialize().hex()
             self.nodes[2].sendrawtransaction(rawtx2)
             fail("Sending transaction should have failed")
         except JSONRPCException as e:

@@ -1,5 +1,6 @@
 // Copyright (c) 2010 Satoshi Nakamoto
 // Copyright (c) 2009-2014 The Bitcoin Core developers
+// Copyright (c) 2015-2020 The Zcash Developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or https://www.opensource.org/licenses/mit-license.php .
 
@@ -12,6 +13,8 @@
 #include "utilstrencodings.h"
 
 #include <assert.h>
+#include <optional>
+#include <variant>
 
 #include <boost/assign/list_of.hpp>
 
@@ -87,12 +90,12 @@ public:
         consensus.fCoinbaseMustBeShielded = true;
         consensus.nSubsidySlowStartInterval = 20000;
         consensus.nPreBlossomSubsidyHalvingInterval = Consensus::PRE_BLOSSOM_HALVING_INTERVAL;
-        consensus.nPostBlossomSubsidyHalvingInterval = Consensus::POST_BLOSSOM_HALVING_INTERVAL;
+        consensus.nPostBlossomSubsidyHalvingInterval = POST_BLOSSOM_HALVING_INTERVAL(Consensus::PRE_BLOSSOM_HALVING_INTERVAL);
         consensus.nMajorityEnforceBlockUpgrade = 750;
         consensus.nMajorityRejectBlockOutdated = 950;
         consensus.nMajorityWindow = 4000;
         const size_t N = 200, K = 9;
-        BOOST_STATIC_ASSERT(equihash_parameters_acceptable(N, K));
+        static_assert(equihash_parameters_acceptable(N, K));
         consensus.nEquihashN = N;
         consensus.nEquihashK = K;
         consensus.powLimit = uint256S("0007ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
@@ -102,7 +105,8 @@ public:
         consensus.nPowMaxAdjustUp = 16; // 16% adjustment up
         consensus.nPreBlossomPowTargetSpacing = Consensus::PRE_BLOSSOM_POW_TARGET_SPACING;
         consensus.nPostBlossomPowTargetSpacing = Consensus::POST_BLOSSOM_POW_TARGET_SPACING;
-        consensus.nPowAllowMinDifficultyBlocksAfterHeight = boost::none;
+        consensus.nPowAllowMinDifficultyBlocksAfterHeight = std::nullopt;
+        consensus.fPowNoRetargeting = false;
         consensus.minDifficultyAtYcashFork = false;
         consensus.scaledDifficultyAtYcashFork = true;
         consensus.vUpgrades[Consensus::BASE_SPROUT].nProtocolVersion = 170002;
@@ -123,13 +127,116 @@ public:
         consensus.vUpgrades[Consensus::UPGRADE_YCASH].nActivationHeight = 570000;
         consensus.vUpgrades[Consensus::UPGRADE_YCASH].hashActivationBlock =
             uint256S("0000014fbc5917ba8bcacf3336faf588d86b32443aa3a490a587af5750c77ec5");
-        
         consensus.vUpgrades[Consensus::UPGRADE_BLOSSOM].nProtocolVersion = 270008;
         consensus.vUpgrades[Consensus::UPGRADE_BLOSSOM].nActivationHeight = Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
-
         consensus.vUpgrades[Consensus::UPGRADE_HEARTWOOD].nProtocolVersion = 270011;
-        consensus.vUpgrades[Consensus::UPGRADE_HEARTWOOD].nActivationHeight =
+        consensus.vUpgrades[Consensus::UPGRADE_HEARTWOOD].nActivationHeight = Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
+        consensus.vUpgrades[Consensus::UPGRADE_CANOPY].nProtocolVersion = 270013;
+        consensus.vUpgrades[Consensus::UPGRADE_CANOPY].nActivationHeight = Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
+        consensus.vUpgrades[Consensus::UPGRADE_NU5].nProtocolVersion = 270015;
+        consensus.vUpgrades[Consensus::UPGRADE_NU5].nActivationHeight =
             Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
+        consensus.vUpgrades[Consensus::UPGRADE_ZFUTURE].nProtocolVersion = 0x7FFFFFFF;
+        consensus.vUpgrades[Consensus::UPGRADE_ZFUTURE].nActivationHeight =
+            Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
+
+        consensus.nFundingPeriodLength = consensus.nPostBlossomSubsidyHalvingInterval / 48;
+
+        // guarantees the first 2 characters, when base58 encoded, are "s1"
+        keyConstants.base58Prefixes[PUBKEY_ADDRESS]     = {0x1C,0x28};
+        // guarantees the first 2 characters, when base58 encoded, are "s3"
+        keyConstants.base58Prefixes[SCRIPT_ADDRESS]     = {0x1C,0x2C};
+        // the first character, when base58 encoded, is "5" or "K" or "L" (as in Bitcoin)
+        keyConstants.base58Prefixes[SECRET_KEY]         = {0x80};
+        // do not rely on these BIP32 prefixes; they are not specified and may change
+        keyConstants.base58Prefixes[EXT_PUBLIC_KEY]     = {0x04,0x88,0xB2,0x1E};
+        keyConstants.base58Prefixes[EXT_SECRET_KEY]     = {0x04,0x88,0xAD,0xE4};
+        // guarantees the first 2 characters, when base58 encoded, are "yc"
+        keyConstants.base58Prefixes[ZCPAYMENT_ADDRESS]  = {0x16,0x36};
+        // guarantees the first 4 characters, when base58 encoded, are "ZiVK"
+        keyConstants.base58Prefixes[ZCVIEWING_KEY]      = {0xA8,0xAB,0xD3};
+        // guarantees the first 2 characters, when base58 encoded, are "SK"
+        keyConstants.base58Prefixes[ZCSPENDING_KEY]     = {0xAB,0x36};
+
+        keyConstants.bech32HRPs[SAPLING_PAYMENT_ADDRESS]      = "ys";
+        keyConstants.bech32HRPs[SAPLING_FULL_VIEWING_KEY]     = "zviews";
+        keyConstants.bech32HRPs[SAPLING_INCOMING_VIEWING_KEY] = "zivks";
+        keyConstants.bech32HRPs[SAPLING_EXTENDED_SPEND_KEY]   = "secret-extended-key-main";
+        keyConstants.bech32HRPs[SAPLING_EXTENDED_FVK]         = "zxviews";
+
+        {
+            std::vector<std::string> ecc_addresses = {
+                "t3LmX1cxWPPPqL4TZHx42HU3U5ghbFjRiif",
+                "t3Toxk1vJQ6UjWQ42tUJz2rV2feUWkpbTDs",
+                "t3ZBdBe4iokmsjdhMuwkxEdqMCFN16YxKe6",
+                "t3ZuaJziLM8xZ32rjDUzVjVtyYdDSz8GLWB",
+                "t3bAtYWa4bi8VrtvqySxnbr5uqcG9czQGTZ",
+                "t3dktADfb5Rmxncpe1HS5BRS5Gcj7MZWYBi",
+                "t3hgskquvKKoCtvxw86yN7q8bzwRxNgUZmc",
+                "t3R1VrLzwcxAZzkX4mX3KGbWpNsgtYtMntj",
+                "t3ff6fhemqPMVujD3AQurxRxTdvS1pPSaa2",
+                "t3cEUQFG3KYnFG6qYhPxSNgGi3HDjUPwC3J",
+                "t3WR9F5U4QvUFqqx9zFmwT6xFqduqRRXnaa",
+                "t3PYc1LWngrdUrJJbHkYPCKvJuvJjcm85Ch",
+                "t3bgkjiUeatWNkhxY3cWyLbTxKksAfk561R",
+                "t3Z5rrR8zahxUpZ8itmCKhMSfxiKjUp5Dk5",
+                "t3PU1j7YW3fJ67jUbkGhSRto8qK2qXCUiW3",
+                "t3S3yaT7EwNLaFZCamfsxxKwamQW2aRGEkh",
+                "t3eutXKJ9tEaPSxZpmowhzKhPfJvmtwTEZK",
+                "t3gbTb7brxLdVVghSPSd3ycGxzHbUpukeDm",
+                "t3UCKW2LrHFqPMQFEbZn6FpjqnhAAbfpMYR",
+                "t3NyHsrnYbqaySoQqEQRyTWkjvM2PLkU7Uu",
+                "t3QEFL6acxuZwiXtW3YvV6njDVGjJ1qeaRo",
+                "t3PdBRr2S1XTDzrV8bnZkXF3SJcrzHWe1wj",
+                "t3ZWyRPpWRo23pKxTLtWsnfEKeq9T4XPxKM",
+                "t3he6QytKCTydhpztykFsSsb9PmBT5JBZLi",
+                "t3VWxWDsLb2TURNEP6tA1ZSeQzUmPKFNxRY",
+                "t3NmWLvZkbciNAipauzsFRMxoZGqmtJksbz",
+                "t3cKr4YxVPvPBG1mCvzaoTTdBNokohsRJ8n",
+                "t3T3smGZn6BoSFXWWXa1RaoQdcyaFjMfuYK",
+                "t3gkDUe9Gm4GGpjMk86TiJZqhztBVMiUSSA",
+                "t3eretuBeBXFHe5jAqeSpUS1cpxVh51fAeb",
+                "t3dN8g9zi2UGJdixGe9txeSxeofLS9t3yFQ",
+                "t3S799pq9sYBFwccRecoTJ3SvQXRHPrHqvx",
+                "t3fhYnv1S5dXwau7GED3c1XErzt4n4vDxmf",
+                "t3cmE3vsBc5xfDJKXXZdpydCPSdZqt6AcNi",
+                "t3h5fPdjJVHaH4HwynYDM5BB3J7uQaoUwKi",
+                "t3Ma35c68BgRX8sdLDJ6WR1PCrKiWHG4Da9",
+                "t3LokMKPL1J8rkJZvVpfuH7dLu6oUWqZKQK",
+                "t3WFFGbEbhJWnASZxVLw2iTJBZfJGGX73mM",
+                "t3L8GLEsUn4QHNaRYcX3EGyXmQ8kjpT1zTa",
+                "t3PgfByBhaBSkH8uq4nYJ9ZBX4NhGCJBVYm",
+                "t3WecsqKDhWXD4JAgBVcnaCC2itzyNZhJrv",
+                "t3ZG9cSfopnsMQupKW5v9sTotjcP5P6RTbn",
+                "t3hC1Ywb5zDwUYYV8LwhvF5rZ6m49jxXSG5",
+                "t3VgMqDL15ZcyQDeqBsBW3W6rzfftrWP2yB",
+                "t3LC94Y6BwLoDtBoK2NuewaEbnko1zvR9rm",
+                "t3cWCUZJR3GtALaTcatrrpNJ3MGbMFVLRwQ",
+                "t3YYF4rPLVxDcF9hHFsXyc5Yq1TFfbojCY6",
+                "t3XHAGxRP2FNfhAjxGjxbrQPYtQQjc3RCQD",
+            };
+
+            // ZF and MG each use a single address repeated 48 times,
+            // once for each funding period.
+            std::vector<std::string> zf_addresses(48, "t3dvVE3SQEi7kqNzwrfNePxZ1d4hUyztBA1");
+            std::vector<std::string> mg_addresses(48, "t3XyYW8yBFRuMnfvm5KLGFbEVz25kckZXym");
+
+            consensus.AddZIP207FundingStream(
+                keyConstants,
+                Consensus::FS_ZIP214_BP,
+                consensus.vUpgrades[Consensus::UPGRADE_CANOPY].nActivationHeight, 2726400,
+                ecc_addresses);
+            consensus.AddZIP207FundingStream(
+                keyConstants,
+                Consensus::FS_ZIP214_ZF,
+                consensus.vUpgrades[Consensus::UPGRADE_CANOPY].nActivationHeight, 2726400,
+                zf_addresses);
+            consensus.AddZIP207FundingStream(
+                keyConstants,
+                Consensus::FS_ZIP214_MG,
+                consensus.vUpgrades[Consensus::UPGRADE_CANOPY].nActivationHeight, 2726400,
+                mg_addresses);
+        }
 
         // The best chain should have at least this much work.
         consensus.nMinimumChainWork = uint256S("0000000000000000000000000000000000000000000000000152d411d731d250");
@@ -158,30 +265,6 @@ public:
         vSeeds.clear();
         vSeeds.push_back(CDNSSeedData("z.cash", "dnsseed.z.cash")); // Zcash
         vSeeds.push_back(CDNSSeedData("ycash.xyz", "seed.ycash.xyz")); // Ycash Seed
-
-        // guarantees the first 2 characters, when base58 encoded, are "s1"
-        base58Prefixes[PUBKEY_ADDRESS]       = {0x1C,0x28};
-        base58Prefixes[ZCASH_PUBKEY_ADDRESS] = {0x1C,0xB8}; // "t1"
-        // guarantees the first 2 characters, when base58 encoded, are "s3"
-        base58Prefixes[SCRIPT_ADDRESS]       = {0x1C,0x2C}; 
-        base58Prefixes[ZCASH_SCRIPT_ADDRESS] = {0x1C,0xBD}; // "t3"
-        // the first character, when base58 encoded, is "5" or "K" or "L" (as in Bitcoin)
-        base58Prefixes[SECRET_KEY]         = {0x80};
-        // do not rely on these BIP32 prefixes; they are not specified and may change
-        base58Prefixes[EXT_PUBLIC_KEY]     = {0x04,0x88,0xB2,0x1E};
-        base58Prefixes[EXT_SECRET_KEY]     = {0x04,0x88,0xAD,0xE4};
-        // guarantees the first 2 characters, when base58 encoded, are "yc"
-        base58Prefixes[ZCPAYMENT_ADDRRESS]       = {0x16,0x36};
-        base58Prefixes[ZCASH_ZCPAYMENT_ADDRRESS] = {0x16,0x9A}; // "zc"
-        // guarantees the first 4 characters, when base58 encoded, are "ZiVK"
-        base58Prefixes[ZCVIEWING_KEY]      = {0xA8,0xAB,0xD3};
-        // guarantees the first 2 characters, when base58 encoded, are "SK"
-        base58Prefixes[ZCSPENDING_KEY]     = {0xAB,0x36};
-
-        bech32HRPs[SAPLING_PAYMENT_ADDRESS]      = "ys";
-        bech32HRPs[SAPLING_FULL_VIEWING_KEY]     = "zviews";
-        bech32HRPs[SAPLING_INCOMING_VIEWING_KEY] = "zivks";
-        bech32HRPs[SAPLING_EXTENDED_SPEND_KEY]   = "secret-extended-key-main";
 
         vFixedSeeds = std::vector<SeedSpec6>(pnSeed6_main, pnSeed6_main + ARRAYLEN(pnSeed6_main));
 
@@ -271,14 +354,8 @@ public:
             "t3PSn5TbMMAEw7Eu36DYctFezRzpX1hzf3M", /* main-index: 45*/
             "t3R3Y5vnBLrEn8L6wFjPjBLnxSUQsKnmFpv", /* main-index: 46*/
             "t3Pcm737EsVkGTbhsu2NekKtJeG92mvYyoN", /* main-index: 47*/
-//            "t3PZ9PPcLzgL57XRSG5ND4WNBC9UTFb8DXv", /* main-index: 48*/
-//            "t3L1WgcyQ95vtpSgjHfgANHyVYvffJZ9iGb", /* main-index: 49*/
-//            "t3JtoXqsv3FuS7SznYCd5pZJGU9di15mdd7", /* main-index: 50*/
-//            "t3hLJHrHs3ytDgExxr1mD8DYSrk1TowGV25", /* main-index: 51*/
-//            "t3fmYHU2DnVaQgPhDs6TMFVmyC3qbWEWgXN", /* main-index: 52*/
-//            "t3T4WmAp6nrLkJ24iPpGeCe1fSWTPv47ASG", /* main-index: 53*/
-//            "t3fP6GrDM4QVwdjFhmCxGNbe7jXXXSDQ5dv", /* main-index: 54*/
         };
+
         assert(vFoundersRewardAddress.size() <= consensus.GetLastFoundersRewardBlockHeight(0));
 
         vYcashFoundersRewardAddress = {
@@ -311,12 +388,12 @@ public:
         consensus.fCoinbaseMustBeShielded = true;
         consensus.nSubsidySlowStartInterval = 20000;
         consensus.nPreBlossomSubsidyHalvingInterval = Consensus::PRE_BLOSSOM_HALVING_INTERVAL;
-        consensus.nPostBlossomSubsidyHalvingInterval = Consensus::POST_BLOSSOM_HALVING_INTERVAL;
+        consensus.nPostBlossomSubsidyHalvingInterval = POST_BLOSSOM_HALVING_INTERVAL(Consensus::PRE_BLOSSOM_HALVING_INTERVAL);
         consensus.nMajorityEnforceBlockUpgrade = 51;
         consensus.nMajorityRejectBlockOutdated = 75;
         consensus.nMajorityWindow = 400;
         const size_t N = 200, K = 9;
-        BOOST_STATIC_ASSERT(equihash_parameters_acceptable(N, K));
+        static_assert(equihash_parameters_acceptable(N, K));
         consensus.nEquihashN = N;
         consensus.nEquihashK = K;
         consensus.powLimit = uint256S("07ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
@@ -328,6 +405,7 @@ public:
         consensus.nPreBlossomPowTargetSpacing = Consensus::PRE_BLOSSOM_POW_TARGET_SPACING;
         consensus.nPostBlossomPowTargetSpacing = Consensus::POST_BLOSSOM_POW_TARGET_SPACING;
         consensus.nPowAllowMinDifficultyBlocksAfterHeight = 299187;
+        consensus.fPowNoRetargeting = false;
         consensus.minDifficultyAtYcashFork = true;
         consensus.scaledDifficultyAtYcashFork = false;
         consensus.vUpgrades[Consensus::BASE_SPROUT].nProtocolVersion = 170002;
@@ -350,18 +428,133 @@ public:
             uint256S("0305d164e8f4dc75b9e9a6a15b7b381dbc1c9cb55f1534267be7c125923255c8");
         
         consensus.vUpgrades[Consensus::UPGRADE_BLOSSOM].nProtocolVersion = 270008;
-        consensus.vUpgrades[Consensus::UPGRADE_BLOSSOM].nActivationHeight = Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
+        consensus.vUpgrades[Consensus::UPGRADE_BLOSSOM].nActivationHeight =             
+            Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
 
         consensus.vUpgrades[Consensus::UPGRADE_HEARTWOOD].nProtocolVersion = 270010;
         consensus.vUpgrades[Consensus::UPGRADE_HEARTWOOD].nActivationHeight =
             Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
+
+        consensus.vUpgrades[Consensus::UPGRADE_CANOPY].nProtocolVersion = 270012;
+        consensus.vUpgrades[Consensus::UPGRADE_CANOPY].nActivationHeight =
+            Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
+
+        consensus.vUpgrades[Consensus::UPGRADE_NU5].nProtocolVersion = 270014;
+        consensus.vUpgrades[Consensus::UPGRADE_NU5].nActivationHeight =
+            Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
+
+
+        consensus.vUpgrades[Consensus::UPGRADE_ZFUTURE].nProtocolVersion = 0x7FFFFFFF;
+        consensus.vUpgrades[Consensus::UPGRADE_ZFUTURE].nActivationHeight =
+            Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
+
+        consensus.nFundingPeriodLength = consensus.nPostBlossomSubsidyHalvingInterval / 48;
+
+        // guarantees the first 2 characters, when base58 encoded, are "sm"
+        keyConstants.base58Prefixes[PUBKEY_ADDRESS]     = {0x1C,0x95};
+        // guarantees the first 2 characters, when base58 encoded, are "t2"
+        keyConstants.base58Prefixes[SCRIPT_ADDRESS]     = {0x1C,0x2A};
+        // the first character, when base58 encoded, is "9" or "c" (as in Bitcoin)
+        keyConstants.base58Prefixes[SECRET_KEY]         = {0xEF};
+        // do not rely on these BIP32 prefixes; they are not specified and may change
+        keyConstants.base58Prefixes[EXT_PUBLIC_KEY]     = {0x04,0x35,0x87,0xCF};
+        keyConstants.base58Prefixes[EXT_SECRET_KEY]     = {0x04,0x35,0x83,0x94};
+        // guarantees the first 2 characters, when base58 encoded, are "yt"
+        keyConstants.base58Prefixes[ZCPAYMENT_ADDRESS]  = {0x16,0x52};
+        // guarantees the first 4 characters, when base58 encoded, are "ZiVt"
+        keyConstants.base58Prefixes[ZCVIEWING_KEY]      = {0xA8,0xAC,0x0C};
+        // guarantees the first 2 characters, when base58 encoded, are "ST"
+        keyConstants.base58Prefixes[ZCSPENDING_KEY]     = {0xAC,0x08};
+
+        keyConstants.bech32HRPs[SAPLING_PAYMENT_ADDRESS]      = "ytestsapling";
+        keyConstants.bech32HRPs[SAPLING_FULL_VIEWING_KEY]     = "zviewtestsapling";
+        keyConstants.bech32HRPs[SAPLING_INCOMING_VIEWING_KEY] = "zivktestsapling";
+        keyConstants.bech32HRPs[SAPLING_EXTENDED_SPEND_KEY]   = "secret-extended-key-test";
+        keyConstants.bech32HRPs[SAPLING_EXTENDED_FVK]         = "zxviewtestsapling";
+
+        // Testnet funding streams
+        {
+            std::vector<std::string> ecc_addresses = {
+                "t26ovBdKAJLtrvBsE2QGF4nqBkEuptuPFZz",
+                "t26ovBdKAJLtrvBsE2QGF4nqBkEuptuPFZz",
+                "t26ovBdKAJLtrvBsE2QGF4nqBkEuptuPFZz",
+                "t26ovBdKAJLtrvBsE2QGF4nqBkEuptuPFZz",
+                "t2NNHrgPpE388atmWSF4DxAb3xAoW5Yp45M",
+                "t2VMN28itPyMeMHBEd9Z1hm6YLkQcGA1Wwe",
+                "t2CHa1TtdfUV8UYhNm7oxbzRyfr8616BYh2",
+                "t2F77xtr28U96Z2bC53ZEdTnQSUAyDuoa67",
+                "t2ARrzhbgcpoVBDPivUuj6PzXzDkTBPqfcT",
+                "t278aQ8XbvFR15mecRguiJDQQVRNnkU8kJw",
+                "t2Dp1BGnZsrTXZoEWLyjHmg3EPvmwBnPDGB",
+                "t2KzeqXgf4ju33hiSqCuKDb8iHjPCjMq9iL",
+                "t2Nyxqv1BiWY1eUSiuxVw36oveawYuo18tr",
+                "t2DKFk5JRsVoiuinK8Ti6eM4Yp7v8BbfTyH",
+                "t2CUaBca4k1x36SC4q8Nc8eBoqkMpF3CaLg",
+                "t296SiKL7L5wvFmEdMxVLz1oYgd6fTfcbZj",
+                "t29fBCFbhgsjL3XYEZ1yk1TUh7eTusB6dPg",
+                "t2FGofLJXa419A76Gpf5ncxQB4gQXiQMXjK",
+                "t2ExfrnRVnRiXDvxerQ8nZbcUQvNvAJA6Qu",
+                "t28JUffLp47eKPRHKvwSPzX27i9ow8LSXHx",
+                "t2JXWPtrtyL861rFWMZVtm3yfgxAf4H7uPA",
+                "t2QdgbJoWfYHgyvEDEZBjHmgkr9yNJff3Hi",
+                "t2QW43nkco8r32ZGRN6iw6eSzyDjkMwCV3n",
+                "t2DgYDXMJTYLwNcxighQ9RCgPxMVATRcUdC",
+                "t2Bop7dg33HGZx3wunnQzi2R2ntfpjuti3M",
+                "t2HVeEwovcLq9RstAbYkqngXNEsCe2vjJh9",
+                "t2HxbP5keQSx7p592zWQ5bJ5GrMmGDsV2Xa",
+                "t2TJzUg2matao3mztBRJoWnJY6ekUau6tPD",
+                "t29pMzxmo6wod25YhswcjKv3AFRNiBZHuhj",
+                "t2QBQMRiJKYjshJpE6RhbF7GLo51yE6d4wZ",
+                "t2F5RqnqguzZeiLtYHFx4yYfy6pDnut7tw5",
+                "t2CHvyZANE7XCtg8AhZnrcHCC7Ys1jJhK13",
+                "t2BRzpMdrGWZJ2upsaNQv6fSbkbTy7EitLo",
+                "t2BFixHGQMAWDY67LyTN514xRAB94iEjXp3",
+                "t2Uvz1iVPzBEWfQBH1p7NZJsFhD74tKaG8V",
+                "t2CmFDj5q6rJSRZeHf1SdrowinyMNcj438n",
+                "t2ErNvWEReTfPDBaNizjMPVssz66aVZh1hZ",
+                "t2GeJQ8wBUiHKDVzVM5ZtKfY5reCg7CnASs",
+                "t2L2eFtkKv1G6j55kLytKXTGuir4raAy3yr",
+                "t2EK2b87dpPazb7VvmEGc8iR6SJ289RywGL",
+                "t2DJ7RKeZJxdA4nZn8hRGXE8NUyTzjujph9",
+                "t2K1pXo4eByuWpKLkssyMLe8QKUbxnfFC3H",
+                "t2TB4mbSpuAcCWkH94Leb27FnRxo16AEHDg",
+                "t2Phx4gVL4YRnNsH3jM1M7jE4Fo329E66Na",
+                "t2VQZGmeNomN8c3USefeLL9nmU6M8x8CVzC",
+                "t2RicCvTVTY5y9JkreSRv3Xs8q2K67YxHLi",
+                "t2JrSLxTGc8wtPDe9hwbaeUjCrCfc4iZnDD",
+                "t2Uh9Au1PDDSw117sAbGivKREkmMxVC5tZo",
+                "t2FDwoJKLeEBMTy3oP7RLQ1Fihhvz49a3Bv",
+                "t2FY18mrgtb7QLeHA8ShnxLXuW8cNQ2n1v8",
+                "t2L15TkDYum7dnQRBqfvWdRe8Yw3jVy9z7g",
+            };
+
+            // ZF and MG use the same address for each funding period
+            std::vector<std::string> zf_addresses(51, "t27eWDgjFYJGVXmzrXeVjnb5J3uXDM9xH9v");
+            std::vector<std::string> mg_addresses(51, "t2Gvxv2uNM7hbbACjNox4H6DjByoKZ2Fa3P");
+
+            consensus.AddZIP207FundingStream(
+                keyConstants,
+                Consensus::FS_ZIP214_BP,
+                consensus.vUpgrades[Consensus::UPGRADE_CANOPY].nActivationHeight, 2796000,
+                ecc_addresses);
+            consensus.AddZIP207FundingStream(
+                keyConstants,
+                Consensus::FS_ZIP214_ZF,
+                consensus.vUpgrades[Consensus::UPGRADE_CANOPY].nActivationHeight, 2796000,
+                zf_addresses);
+            consensus.AddZIP207FundingStream(
+                keyConstants,
+                Consensus::FS_ZIP214_MG,
+                consensus.vUpgrades[Consensus::UPGRADE_CANOPY].nActivationHeight, 2796000,
+                mg_addresses);
+        }
 
         // On testnet we activate this rule 6 blocks after Blossom activation. From block 299188 and
         // prior to Blossom activation, the testnet minimum-difficulty threshold was 15 minutes (i.e.
         // a minimum difficulty block can be mined if no block is mined normally within 15 minutes):
         // <https://zips.z.cash/zip-0205#change-to-difficulty-adjustment-on-testnet>
         // However the median-time-past is 6 blocks behind, and the worst-case time for 7 blocks at a
-        // 15-minute spacing is ~105 minutes, which is exceeds the limit imposed by the soft fork of
+        // 15-minute spacing is ~105 minutes, which exceeds the limit imposed by the soft fork of
         // 90 minutes.
         //
         // After Blossom, the minimum difficulty threshold time is changed to 6 times the block target
@@ -398,30 +591,6 @@ public:
         vSeeds.push_back(CDNSSeedData("z.cash", "dnsseed.testnet.z.cash")); // Zcash
         vSeeds.push_back(CDNSSeedData("ycash.xyz", "testseed.ycash.xyz")); // Ycash
 
-        // guarantees the first 2 characters, when base58 encoded, are "sm"
-        base58Prefixes[PUBKEY_ADDRESS]       = {0x1C,0x95}; 
-        base58Prefixes[ZCASH_PUBKEY_ADDRESS] = {0x1D,0x25}; // "tm"
-        // guarantees the first 2 characters, when base58 encoded, are "s2"
-        base58Prefixes[SCRIPT_ADDRESS]           = {0x1C,0x2A};
-        base58Prefixes[ZCASH_SCRIPT_ADDRESS]     = {0x1C,0xBA};  // "t2"
-        // the first character, when base58 encoded, is "9" or "c" (as in Bitcoin)
-        base58Prefixes[SECRET_KEY]         = {0xEF};
-        // do not rely on these BIP32 prefixes; they are not specified and may change
-        base58Prefixes[EXT_PUBLIC_KEY]     = {0x04,0x35,0x87,0xCF};
-        base58Prefixes[EXT_SECRET_KEY]     = {0x04,0x35,0x83,0x94};
-        // guarantees the first 2 characters, when base58 encoded, are "yt"
-        base58Prefixes[ZCPAYMENT_ADDRRESS]       = {0x16,0x52}; 
-        base58Prefixes[ZCASH_ZCPAYMENT_ADDRRESS] = {0x16,0xB6}; // "zt"
-        // guarantees the first 4 characters, when base58 encoded, are "ZiVt"
-        base58Prefixes[ZCVIEWING_KEY]      = {0xA8,0xAC,0x0C};
-        // guarantees the first 2 characters, when base58 encoded, are "ST"
-        base58Prefixes[ZCSPENDING_KEY]     = {0xAC,0x08};
-
-        bech32HRPs[SAPLING_PAYMENT_ADDRESS]      = "ytestsapling";
-        bech32HRPs[SAPLING_FULL_VIEWING_KEY]     = "zviewtestsapling";
-        bech32HRPs[SAPLING_INCOMING_VIEWING_KEY] = "zivktestsapling";
-        bech32HRPs[SAPLING_EXTENDED_SPEND_KEY]   = "secret-extended-key-test";
-
         vFixedSeeds = std::vector<SeedSpec6>(pnSeed6_test, pnSeed6_test + ARRAYLEN(pnSeed6_test));
 
         fMiningRequiresPeers = true;
@@ -451,17 +620,17 @@ public:
         // Founders reward script expects a vector of 2-of-3 multisig addresses
         vFoundersRewardAddress = {
             "t2UNzUUx8mWBCRYPRezvA363EYXyEpHokyi", "t2N9PH9Wk9xjqYg9iin1Ua3aekJqfAtE543", "t2NGQjYMQhFndDHguvUw4wZdNdsssA6K7x2", "t2ENg7hHVqqs9JwU5cgjvSbxnT2a9USNfhy",
-            "t2BkYdVCHzvTJJUTx4yZB8qeegD8QsPx8bo", "t2J8q1xH1EuigJ52MfExyyjYtN3VgvshKDf", "t2Crq9mydTm37kZokC68HzT6yez3t2FBnFj", "t2EaMPUiQ1kthqcP5UEkF42CAFKJqXCkXC9", 
-            "t2F9dtQc63JDDyrhnfpzvVYTJcr57MkqA12", "t2LPirmnfYSZc481GgZBa6xUGcoovfytBnC", "t26xfxoSw2UV9Pe5o3C8V4YybQD4SESfxtp", "t2D3k4fNdErd66YxtvXEdft9xuLoKD7CcVo", 
-            "t2DWYBkxKNivdmsMiivNJzutaQGqmoRjRnL", "t2C3kFF9iQRxfc4B9zgbWo4dQLLqzqjpuGQ", "t2MnT5tzu9HSKcppRyUNwoTp8MUueuSGNaB", "t2AREsWdoW1F8EQYsScsjkgqobmgrkKeUkK", 
-            "t2Vf4wKcJ3ZFtLj4jezUUKkwYR92BLHn5UT", "t2K3fdViH6R5tRuXLphKyoYXyZhyWGghDNY", "t2VEn3KiKyHSGyzd3nDw6ESWtaCQHwuv9WC", "t2F8XouqdNMq6zzEvxQXHV1TjwZRHwRg8gC", 
-            "t2BS7Mrbaef3fA4xrmkvDisFVXVrRBnZ6Qj", "t2FuSwoLCdBVPwdZuYoHrEzxAb9qy4qjbnL", "t2SX3U8NtrT6gz5Db1AtQCSGjrpptr8JC6h", "t2V51gZNSoJ5kRL74bf9YTtbZuv8Fcqx2FH", 
-            "t2FyTsLjjdm4jeVwir4xzj7FAkUidbr1b4R", "t2EYbGLekmpqHyn8UBF6kqpahrYm7D6N1Le", "t2NQTrStZHtJECNFT3dUBLYA9AErxPCmkka", "t2GSWZZJzoesYxfPTWXkFn5UaxjiYxGBU2a", 
-            "t2RpffkzyLRevGM3w9aWdqMX6bd8uuAK3vn", "t2JzjoQqnuXtTGSN7k7yk5keURBGvYofh1d", "t2AEefc72ieTnsXKmgK2bZNckiwvZe3oPNL", "t2NNs3ZGZFsNj2wvmVd8BSwSfvETgiLrD8J", 
-            "t2ECCQPVcxUCSSQopdNquguEPE14HsVfcUn", "t2JabDUkG8TaqVKYfqDJ3rqkVdHKp6hwXvG", "t2FGzW5Zdc8Cy98ZKmRygsVGi6oKcmYir9n", "t2DUD8a21FtEFn42oVLp5NGbogY13uyjy9t", 
-            "t2UjVSd3zheHPgAkuX8WQW2CiC9xHQ8EvWp", "t2TBUAhELyHUn8i6SXYsXz5Lmy7kDzA1uT5", "t2Tz3uCyhP6eizUWDc3bGH7XUC9GQsEyQNc", "t2NysJSZtLwMLWEJ6MH3BsxRh6h27mNcsSy", 
-            "t2KXJVVyyrjVxxSeazbY9ksGyft4qsXUNm9", "t2J9YYtH31cveiLZzjaE4AcuwVho6qjTNzp", "t2QgvW4sP9zaGpPMH1GRzy7cpydmuRfB4AZ", "t2NDTJP9MosKpyFPHJmfjc5pGCvAU58XGa4", 
-            "t29pHDBWq7qN4EjwSEHg8wEqYe9pkmVrtRP", "t2Ez9KM8VJLuArcxuEkNRAkhNvidKkzXcjJ", "t2D5y7J5fpXajLbGrMBQkFg2mFN8fo3n8cX", "t2UV2wr1PTaUiybpkV3FdSdGxUJeZdZztyt", 
+            "t2BkYdVCHzvTJJUTx4yZB8qeegD8QsPx8bo", "t2J8q1xH1EuigJ52MfExyyjYtN3VgvshKDf", "t2Crq9mydTm37kZokC68HzT6yez3t2FBnFj", "t2EaMPUiQ1kthqcP5UEkF42CAFKJqXCkXC9",
+            "t2F9dtQc63JDDyrhnfpzvVYTJcr57MkqA12", "t2LPirmnfYSZc481GgZBa6xUGcoovfytBnC", "t26xfxoSw2UV9Pe5o3C8V4YybQD4SESfxtp", "t2D3k4fNdErd66YxtvXEdft9xuLoKD7CcVo",
+            "t2DWYBkxKNivdmsMiivNJzutaQGqmoRjRnL", "t2C3kFF9iQRxfc4B9zgbWo4dQLLqzqjpuGQ", "t2MnT5tzu9HSKcppRyUNwoTp8MUueuSGNaB", "t2AREsWdoW1F8EQYsScsjkgqobmgrkKeUkK",
+            "t2Vf4wKcJ3ZFtLj4jezUUKkwYR92BLHn5UT", "t2K3fdViH6R5tRuXLphKyoYXyZhyWGghDNY", "t2VEn3KiKyHSGyzd3nDw6ESWtaCQHwuv9WC", "t2F8XouqdNMq6zzEvxQXHV1TjwZRHwRg8gC",
+            "t2BS7Mrbaef3fA4xrmkvDisFVXVrRBnZ6Qj", "t2FuSwoLCdBVPwdZuYoHrEzxAb9qy4qjbnL", "t2SX3U8NtrT6gz5Db1AtQCSGjrpptr8JC6h", "t2V51gZNSoJ5kRL74bf9YTtbZuv8Fcqx2FH",
+            "t2FyTsLjjdm4jeVwir4xzj7FAkUidbr1b4R", "t2EYbGLekmpqHyn8UBF6kqpahrYm7D6N1Le", "t2NQTrStZHtJECNFT3dUBLYA9AErxPCmkka", "t2GSWZZJzoesYxfPTWXkFn5UaxjiYxGBU2a",
+            "t2RpffkzyLRevGM3w9aWdqMX6bd8uuAK3vn", "t2JzjoQqnuXtTGSN7k7yk5keURBGvYofh1d", "t2AEefc72ieTnsXKmgK2bZNckiwvZe3oPNL", "t2NNs3ZGZFsNj2wvmVd8BSwSfvETgiLrD8J",
+            "t2ECCQPVcxUCSSQopdNquguEPE14HsVfcUn", "t2JabDUkG8TaqVKYfqDJ3rqkVdHKp6hwXvG", "t2FGzW5Zdc8Cy98ZKmRygsVGi6oKcmYir9n", "t2DUD8a21FtEFn42oVLp5NGbogY13uyjy9t",
+            "t2UjVSd3zheHPgAkuX8WQW2CiC9xHQ8EvWp", "t2TBUAhELyHUn8i6SXYsXz5Lmy7kDzA1uT5", "t2Tz3uCyhP6eizUWDc3bGH7XUC9GQsEyQNc", "t2NysJSZtLwMLWEJ6MH3BsxRh6h27mNcsSy",
+            "t2KXJVVyyrjVxxSeazbY9ksGyft4qsXUNm9", "t2J9YYtH31cveiLZzjaE4AcuwVho6qjTNzp", "t2QgvW4sP9zaGpPMH1GRzy7cpydmuRfB4AZ", "t2NDTJP9MosKpyFPHJmfjc5pGCvAU58XGa4",
+            "t29pHDBWq7qN4EjwSEHg8wEqYe9pkmVrtRP", "t2Ez9KM8VJLuArcxuEkNRAkhNvidKkzXcjJ", "t2D5y7J5fpXajLbGrMBQkFg2mFN8fo3n8cX", "t2UV2wr1PTaUiybpkV3FdSdGxUJeZdZztyt",
             };
         assert(vFoundersRewardAddress.size() <= consensus.GetLastFoundersRewardBlockHeight(0));
 
@@ -495,12 +664,12 @@ public:
         consensus.fCoinbaseMustBeShielded = false;
         consensus.nSubsidySlowStartInterval = 0;
         consensus.nPreBlossomSubsidyHalvingInterval = Consensus::PRE_BLOSSOM_REGTEST_HALVING_INTERVAL;
-        consensus.nPostBlossomSubsidyHalvingInterval = Consensus::POST_BLOSSOM_REGTEST_HALVING_INTERVAL;
+        consensus.nPostBlossomSubsidyHalvingInterval = POST_BLOSSOM_HALVING_INTERVAL(Consensus::PRE_BLOSSOM_REGTEST_HALVING_INTERVAL);
         consensus.nMajorityEnforceBlockUpgrade = 750;
         consensus.nMajorityRejectBlockOutdated = 950;
         consensus.nMajorityWindow = 1000;
         const size_t N = 48, K = 5;
-        BOOST_STATIC_ASSERT(equihash_parameters_acceptable(N, K));
+        static_assert(equihash_parameters_acceptable(N, K));
         consensus.nEquihashN = N;
         consensus.nEquihashK = K;
         consensus.powLimit = uint256S("0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f");
@@ -511,6 +680,7 @@ public:
         consensus.nPreBlossomPowTargetSpacing = Consensus::PRE_BLOSSOM_POW_TARGET_SPACING;
         consensus.nPostBlossomPowTargetSpacing = Consensus::POST_BLOSSOM_POW_TARGET_SPACING;
         consensus.nPowAllowMinDifficultyBlocksAfterHeight = 0;
+        consensus.fPowNoRetargeting = true;
         consensus.minDifficultyAtYcashFork = false;
         consensus.scaledDifficultyAtYcashFork = false;
         consensus.vUpgrades[Consensus::BASE_SPROUT].nProtocolVersion = 170002;
@@ -531,9 +701,38 @@ public:
         consensus.vUpgrades[Consensus::UPGRADE_BLOSSOM].nProtocolVersion = 270008;
         consensus.vUpgrades[Consensus::UPGRADE_BLOSSOM].nActivationHeight = 
             Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
-        consensus.vUpgrades[Consensus::UPGRADE_HEARTWOOD].nProtocolVersion = 170010;
+        consensus.vUpgrades[Consensus::UPGRADE_HEARTWOOD].nProtocolVersion = 270010;
         consensus.vUpgrades[Consensus::UPGRADE_HEARTWOOD].nActivationHeight =
             Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
+        consensus.vUpgrades[Consensus::UPGRADE_CANOPY].nProtocolVersion = 270012;
+        consensus.vUpgrades[Consensus::UPGRADE_CANOPY].nActivationHeight =
+            Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
+        consensus.vUpgrades[Consensus::UPGRADE_NU5].nProtocolVersion = 270014;
+        consensus.vUpgrades[Consensus::UPGRADE_NU5].nActivationHeight =
+            Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
+        consensus.vUpgrades[Consensus::UPGRADE_ZFUTURE].nProtocolVersion = 0x7FFFFFFF;
+        consensus.vUpgrades[Consensus::UPGRADE_ZFUTURE].nActivationHeight =
+            Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
+
+        consensus.nFundingPeriodLength = consensus.nPostBlossomSubsidyHalvingInterval / 48;
+        // Defined funding streams can be enabled with node config flags.
+
+        // These prefixes are the same as the testnet prefixes
+        keyConstants.base58Prefixes[PUBKEY_ADDRESS]     = {0x1C,0x95};
+        keyConstants.base58Prefixes[SCRIPT_ADDRESS]     = {0x1C,0x2A};
+        keyConstants.base58Prefixes[SECRET_KEY]         = {0xEF};
+        // do not rely on these BIP32 prefixes; they are not specified and may change
+        keyConstants.base58Prefixes[EXT_PUBLIC_KEY]     = {0x04,0x35,0x87,0xCF};
+        keyConstants.base58Prefixes[EXT_SECRET_KEY]     = {0x04,0x35,0x83,0x94};
+        keyConstants.base58Prefixes[ZCPAYMENT_ADDRESS]  = {0x16,0x52};
+        keyConstants.base58Prefixes[ZCVIEWING_KEY]      = {0xA8,0xAC,0x0C};
+        keyConstants.base58Prefixes[ZCSPENDING_KEY]     = {0xAC,0x08};
+
+        keyConstants.bech32HRPs[SAPLING_PAYMENT_ADDRESS]      = "yregtestsapling";
+        keyConstants.bech32HRPs[SAPLING_FULL_VIEWING_KEY]     = "zviewregtestsapling";
+        keyConstants.bech32HRPs[SAPLING_INCOMING_VIEWING_KEY] = "zivkregtestsapling";
+        keyConstants.bech32HRPs[SAPLING_EXTENDED_SPEND_KEY]   = "secret-extended-key-regtest";
+        keyConstants.bech32HRPs[SAPLING_EXTENDED_FVK]         = "zxviewregtestsapling";
 
         // The best chain should have at least this much work.
         consensus.nMinimumChainWork = uint256S("0x00");
@@ -569,29 +768,7 @@ public:
             0,
             0,
             0
-        };
-        // These prefixes are the same as the testnet prefixes
-        base58Prefixes[PUBKEY_ADDRESS]       = {0x1C,0x95};
-        base58Prefixes[ZCASH_PUBKEY_ADDRESS] = {0x1D,0x25};
 
-        base58Prefixes[SCRIPT_ADDRESS]           = {0x1C,0x2A};
-        base58Prefixes[ZCASH_SCRIPT_ADDRESS]     = {0x1C,0xBA};
-        
-        base58Prefixes[SECRET_KEY]         = {0xEF};
-        // do not rely on these BIP32 prefixes; they are not specified and may change
-        base58Prefixes[EXT_PUBLIC_KEY]     = {0x04,0x35,0x87,0xCF};
-        base58Prefixes[EXT_SECRET_KEY]     = {0x04,0x35,0x83,0x94};
-        
-        base58Prefixes[ZCPAYMENT_ADDRRESS]       = {0x16,0x52}; 
-        base58Prefixes[ZCASH_ZCPAYMENT_ADDRRESS] = {0x16,0xB6};
-
-        base58Prefixes[ZCVIEWING_KEY]      = {0xA8,0xAC,0x0C};
-        base58Prefixes[ZCSPENDING_KEY]     = {0xAC,0x08};
-
-        bech32HRPs[SAPLING_PAYMENT_ADDRESS]      = "yregtestsapling";
-        bech32HRPs[SAPLING_FULL_VIEWING_KEY]     = "zviewregtestsapling";
-        bech32HRPs[SAPLING_INCOMING_VIEWING_KEY] = "zivkregtestsapling";
-        bech32HRPs[SAPLING_EXTENDED_SPEND_KEY]   = "secret-extended-key-regtest";
 
         // Founders reward script expects a vector of 2-of-3 multisig addresses
         vFoundersRewardAddress = { "t2FwcEhFdNXuFMv1tcYwaBJtYVtMj8b1uTg" };
@@ -604,11 +781,22 @@ public:
         consensus.vUpgrades[idx].nActivationHeight = nActivationHeight;
     }
 
-    void UpdateRegtestPow(int64_t nPowMaxAdjustDown, int64_t nPowMaxAdjustUp, uint256 powLimit)
+    void UpdateFundingStreamParameters(Consensus::FundingStreamIndex idx, Consensus::FundingStream fs)
+    {
+        assert(idx >= Consensus::FIRST_FUNDING_STREAM && idx < Consensus::MAX_FUNDING_STREAMS);
+        consensus.vFundingStreams[idx] = fs;
+    }
+
+    void UpdateRegtestPow(
+        int64_t nPowMaxAdjustDown,
+        int64_t nPowMaxAdjustUp,
+        uint256 powLimit,
+        bool noRetargeting)
     {
         consensus.nPowMaxAdjustDown = nPowMaxAdjustDown;
         consensus.nPowMaxAdjustUp = nPowMaxAdjustUp;
         consensus.powLimit = powLimit;
+        consensus.fPowNoRetargeting = noRetargeting;
     }
 
     void SetRegTestZIP209Enabled() {
@@ -688,26 +876,27 @@ std::string CChainParams::GetFoundersRewardAddressAtHeight(int nHeight) const {
 // is expected to be a multisig (P2SH) address.
 // Post YCash, return a regular address (For now)
 CScript CChainParams::GetFoundersRewardScriptAtHeight(int nHeight) const {    
+    KeyIO keyIO(*this);
     if (CurrentEpoch(nHeight, this->GetConsensus()) < Consensus::UPGRADE_YCASH) {
         assert(nHeight > 0 && nHeight <= consensus.GetLastFoundersRewardBlockHeight(nHeight));
 
-        CTxDestination address = DecodeDestination(GetFoundersRewardAddressAtHeight(nHeight).c_str());
+        CTxDestination address = keyIO.DecodeDestination(GetFoundersRewardAddressAtHeight(nHeight).c_str());
         assert(IsValidDestination(address));
-        assert(boost::get<CScriptID>(&address) != nullptr);
-        CScriptID scriptID = boost::get<CScriptID>(address); // address is a boost variant
+        assert(IsScriptDestination(address));
+        CScriptID scriptID = std::get<CScriptID>(address); // address is a variant
         CScript script = CScript() << OP_HASH160 << ToByteVector(scriptID) << OP_EQUAL;
         return script;
     } else {
-        CTxDestination address = DecodeDestination(GetFoundersRewardAddressAtHeight(nHeight).c_str());
+        CTxDestination address = keyIO.DecodeDestination(GetFoundersRewardAddressAtHeight(nHeight).c_str());
         assert(IsValidDestination(address));
-        assert(boost::get<CKeyID>(&address) != nullptr || boost::get<CScriptID>(&address) != nullptr);
+        assert(std::get<CKeyID>(&address) != std::nullopt || std::get<CScriptID>(&address) != std::nullopt);
 
-        if (boost::get<CKeyID>(&address) != nullptr) { // Address is a regular address
-            CScriptID keyID = boost::get<CKeyID>(address); 
+        if (std::get<CKeyID>(&address) != std::nullopt) { // Address is a regular address
+            CScriptID keyID = std::get<CKeyID>(address); 
             CScript script =  CScript() << OP_DUP << OP_HASH160 << ToByteVector(keyID) << OP_EQUALVERIFY << OP_CHECKSIG;
             return script;
         } else { // Address is multisig address
-            CScriptID scriptID = boost::get<CScriptID>(address); 
+            CScriptID scriptID = std::get<CScriptID>(address); 
             CScript script = CScript() << OP_HASH160 << ToByteVector(scriptID) << OP_EQUAL;
             return script;
         }
@@ -757,6 +946,16 @@ unsigned int CChainParams::EquihashK(int nHeight) const {
     return k;
 }
 
-void UpdateRegtestPow(int64_t nPowMaxAdjustDown, int64_t nPowMaxAdjustUp, uint256 powLimit) {
-    regTestParams.UpdateRegtestPow(nPowMaxAdjustDown, nPowMaxAdjustUp, powLimit);
+void UpdateFundingStreamParameters(Consensus::FundingStreamIndex idx, Consensus::FundingStream fs)
+{
+    regTestParams.UpdateFundingStreamParameters(idx, fs);
+}
+
+void UpdateRegtestPow(
+    int64_t nPowMaxAdjustDown,
+    int64_t nPowMaxAdjustUp,
+    uint256 powLimit,
+    bool noRetargeting)
+{
+    regTestParams.UpdateRegtestPow(nPowMaxAdjustDown, nPowMaxAdjustUp, powLimit, noRetargeting);
 }

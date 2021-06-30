@@ -1,5 +1,5 @@
-#!/usr/bin/env python
-# Copyright (c) 2014 The Bitcoin Core developers
+#!/usr/bin/env python3
+# Copyright (c) 2014-2016 The Bitcoin Core developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or https://www.opensource.org/licenses/mit-license.php .
 
@@ -8,14 +8,19 @@
 # the blockchain is re-organized.
 #
 
-import sys; assert sys.version_info < (3,), ur"This script does not run under Python 3. Please use Python 2.7.x."
-
 from test_framework.test_framework import BitcoinTestFramework
-from test_framework.util import assert_equal, start_node
+from test_framework.util import assert_equal, start_node, DEFAULT_FEE
+
+from decimal import Decimal
 
 
 # Create one-input, one-output, no-fee transaction:
 class MempoolCoinbaseTest(BitcoinTestFramework):
+
+    def __init__(self):
+        super().__init__()
+        self.num_nodes = 1
+        self.setup_clean_chain = False
 
     def setup_network(self):
         # Just need one node for this test
@@ -52,7 +57,7 @@ class MempoolCoinbaseTest(BitcoinTestFramework):
         blocks = []
         blocks.extend(self.nodes[0].generate(1))
 
-        spends2_raw = [ self.create_tx(txid, node0_address, 9.999) for txid in spends1_id ]
+        spends2_raw = [ self.create_tx(txid, node0_address, Decimal('10.0') - DEFAULT_FEE) for txid in spends1_id ]
         spends2_id = [ self.nodes[0].sendrawtransaction(tx) for tx in spends2_raw ]
 
         blocks.extend(self.nodes[0].generate(1))

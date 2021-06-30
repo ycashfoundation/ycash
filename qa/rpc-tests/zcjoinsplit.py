@@ -1,10 +1,8 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 #
 # Test joinsplit semantics
 #
-
-import sys; assert sys.version_info < (3,), ur"This script does not run under Python 3. Please use Python 2.7.x."
 
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import assert_equal, start_node, \
@@ -12,6 +10,10 @@ from test_framework.util import assert_equal, start_node, \
 
 
 class JoinSplitTest(BitcoinTestFramework):
+    def __init__(self):
+        super().__init__()
+        self.num_nodes = 1
+
     def setup_network(self):
         self.nodes = []
         self.is_network_split = False
@@ -53,7 +55,7 @@ class JoinSplitTest(BitcoinTestFramework):
         self.nodes[0].generate(1)
         self.sync_all()
 
-        print "Done!"
+        print("Done!")
         receive_result = self.nodes[0].zcrawreceive(zcsecretkey, joinsplit_result["encryptednote1"])
         assert_equal(receive_result["exists"], True)
 
