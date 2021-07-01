@@ -12,6 +12,7 @@
 #include "primitives/block.h"
 #include "streams.h"
 #include "uint256.h"
+#include "util.h"
 
 #include <librustzcash.h>
 

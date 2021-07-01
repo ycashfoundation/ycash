@@ -2054,7 +2054,7 @@ void RelayTransaction(const CTransaction& tx)
     // nodes that are fully synced. This will prevent us from getting banned
     // for relaying Txns that we think are valid, but are invalid with future 
     // forks.
-    if (IsInitialBlockDownload(Params())) {
+    if (IsInitialBlockDownload(Params().GetConsensus())) {
         LogPrint("net", "Not relaying Tx since we're still syncing: %s", tx.GetHash().ToString());
         return;
     }

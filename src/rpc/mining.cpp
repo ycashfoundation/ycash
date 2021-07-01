@@ -1008,7 +1008,7 @@ UniValue getblocksubsidy(const UniValue& params, bool fHelp)
         }
         result.pushKV("fundingstreams", fundingstreams);
     } else if (nHeight > 0 && nHeight <= consensus.GetLastFoundersRewardBlockHeight(nHeight)) {
-        nFoundersReward = nReward / 20;   // 5% perpetual
+        nFoundersReward = nMinerReward / 20;   // 5% perpetual
         nMinerReward -= nFoundersReward;
     }
     result.pushKV("miner", ValueFromAmount(nMinerReward));

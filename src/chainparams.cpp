@@ -768,7 +768,7 @@ public:
             0,
             0,
             0
-
+        };
 
         // Founders reward script expects a vector of 2-of-3 multisig addresses
         vFoundersRewardAddress = { "t2FwcEhFdNXuFMv1tcYwaBJtYVtMj8b1uTg" };
@@ -889,9 +889,9 @@ CScript CChainParams::GetFoundersRewardScriptAtHeight(int nHeight) const {
     } else {
         CTxDestination address = keyIO.DecodeDestination(GetFoundersRewardAddressAtHeight(nHeight).c_str());
         assert(IsValidDestination(address));
-        assert(std::get<CKeyID>(&address) != std::nullopt || std::get<CScriptID>(&address) != std::nullopt);
+        assert(IsKeyDestination(address) || IsScriptDestination(address));
 
-        if (std::get<CKeyID>(&address) != std::nullopt) { // Address is a regular address
+        if (IsKeyDestination(address)) { // Address is a regular address
             CScriptID keyID = std::get<CKeyID>(address); 
             CScript script =  CScript() << OP_DUP << OP_HASH160 << ToByteVector(keyID) << OP_EQUALVERIFY << OP_CHECKSIG;
             return script;
