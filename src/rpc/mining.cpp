@@ -726,14 +726,10 @@ UniValue getblocktemplate(const UniValue& params, bool fHelp)
         entry.pushKV("sigops", pblocktemplate->vTxSigOps[index_in_template]);
 
         if (tx.IsCoinBase()) {
-            // Show founders' reward if it is required
-            auto nextHeight = pindexPrev->nHeight+1;
-            bool canopyActive = consensus.NetworkUpgradeActive(nextHeight, Consensus::UPGRADE_CANOPY);
-            if (!canopyActive && nextHeight > 0 && nextHeight <= consensus.GetLastFoundersRewardBlockHeight(nextHeight)) {
-                CAmount nBlockSubsidy = GetBlockSubsidy(nextHeight, consensus);
-                entry.pushKV("foundersreward", (int64_t)tx.vout[1].nValue);
-                entry.pushKV("foundersaddress", Params().GetFoundersRewardAddressAtHeight(nextHeight)); 
-            }
+            // Show founders' reward (forever active, so required)
+            auto nextHeight = pindexPrev->nHeight + 1;
+            entry.pushKV("foundersreward", (int64_t)tx.vout[1].nValue);
+            entry.pushKV("foundersaddress", Params().GetFoundersRewardAddressAtHeight(nextHeight));
             entry.pushKV("required", true);
             txCoinbase = entry;
         } else {
@@ -968,6 +964,17 @@ UniValue getblocksubsidy(const UniValue& params, bool fHelp)
     bool canopyActive = consensus.NetworkUpgradeActive(nHeight, Consensus::UPGRADE_CANOPY);
 
     UniValue result(UniValue::VOBJ);
+
+    if (!consensus.NetworkUpgradeActive(nHeight, Consensus::UPGRADE_YCASH)) {
+        if (nHeight > 0 && nHeight <= consensus.GetLastFoundersRewardBlockHeight(nHeight)) {
+            nFoundersReward = nMinerReward / 5; // 20% to Zcash founders
+        }
+    } else {
+        nFoundersReward = nMinerReward / 20;   // 5% to Ycash founders
+    }
+
+    nMinerReward -= nFoundersReward;
+
     if (canopyActive) {
         KeyIO keyIO(Params());
         UniValue fundingstreams(UniValue::VARR);
@@ -1007,13 +1014,12 @@ UniValue getblocksubsidy(const UniValue& params, bool fHelp)
             fundingstreams.push_back(fsobj);
         }
         result.pushKV("fundingstreams", fundingstreams);
-    } else if (nHeight > 0 && nHeight <= consensus.GetLastFoundersRewardBlockHeight(nHeight)) {
-        nFoundersReward = nMinerReward / 20;   // 5% perpetual
-        nMinerReward -= nFoundersReward;
     }
+
     result.pushKV("miner", ValueFromAmount(nMinerReward));
     result.pushKV("founders", ValueFromAmount(nFoundersReward));
     result.pushKV("foundersaddress", Params().GetFoundersRewardAddressAtHeight(nHeight));
+    
     return result;
 }
 

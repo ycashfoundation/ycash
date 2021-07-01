@@ -483,7 +483,7 @@ int printMetrics(size_t cols, bool mining)
                         chainActive.Contains(mapBlockIndex[hash])) {
                     int height = mapBlockIndex[hash]->nHeight;
                     CAmount subsidy = GetBlockSubsidy(height, consensusParams);
-                    if (CurrentEpoch(height, consensusParams) < Consensus::UPGRADE_YCASH) {
+                    if (!consensusParams.NetworkUpgradeActive(height, Consensus::UPGRADE_YCASH)) {
                         if ((height > 0) && (height <= consensusParams.GetLastFoundersRewardBlockHeight(height))) {
                             subsidy -= subsidy/5;
                         }

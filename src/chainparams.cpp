@@ -694,7 +694,7 @@ void SelectParams(const std::string& network)
 // Index variable i ranges from 0 - (vFoundersRewardAddress.size()-1)
 std::string CChainParams::GetFoundersRewardAddressAtHeight(int nHeight) const {
     // Pre YCash
-    if (CurrentEpoch(nHeight, this->GetConsensus()) < Consensus::UPGRADE_YCASH) {
+    if (!this->GetConsensus().NetworkUpgradeActive(nHeight, Consensus::UPGRADE_YCASH)) {
         int preBlossomMaxHeight = consensus.GetLastFoundersRewardBlockHeight(0);
         // zip208
         // FounderAddressAdjustedHeight(height) :=
@@ -726,7 +726,7 @@ std::string CChainParams::GetFoundersRewardAddressAtHeight(int nHeight) const {
 // Post YCash, return a regular address (For now)
 CScript CChainParams::GetFoundersRewardScriptAtHeight(int nHeight) const {    
     KeyIO keyIO(*this);
-    if (CurrentEpoch(nHeight, this->GetConsensus()) < Consensus::UPGRADE_YCASH) {
+    if (!this->GetConsensus().NetworkUpgradeActive(nHeight, Consensus::UPGRADE_YCASH)) {
         assert(nHeight > 0 && nHeight <= consensus.GetLastFoundersRewardBlockHeight(nHeight));
 
         CTxDestination address = keyIO.DecodeDestination(GetFoundersRewardAddressAtHeight(nHeight).c_str());

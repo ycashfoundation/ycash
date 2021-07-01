@@ -96,7 +96,8 @@ namespace Consensus {
     }
 
     int Params::GetLastFoundersRewardBlockHeight(int nHeight) const {
-        return HalvingHeight(nHeight, 1) - 1;
+        // Although this function returns 849999, rewarding of Ycash founders continues forever (5% of block subsidy)
+        return HalvingHeight(nHeight, 1) - 1; 
     }
 
     int Params::FundingPeriodIndex(int fundingStreamStartHeight, int nHeight) const {
