@@ -272,6 +272,28 @@ bool KeyIO::IsValidDestinationString(const std::string& str)
     return IsValidDestination(DecodeDestination(str));
 }
 
+std::string KeyIO::ZecToYec(const std::string& str)
+{
+    CTxDestination dest = CNoDestination();
+    std::vector<unsigned char> data;
+    uint160 hash;
+    if (DecodeBase58Check(str, data)) {
+        const std::vector<unsigned char>& zec_pubkey_prefix = keyConstants.Base58Prefix(KeyConstants::LEGACY_PUBKEY_ADDRESS);
+        if (data.size() == hash.size() + zec_pubkey_prefix.size() && std::equal(zec_pubkey_prefix.begin(), zec_pubkey_prefix.end(), data.begin())) {
+            std::copy(data.begin() + zec_pubkey_prefix.size(), data.end(), hash.begin());
+            dest = CKeyID(hash);
+        } else {
+            const std::vector<unsigned char>& zec_script_prefix = keyConstants.Base58Prefix(KeyConstants::LEGACY_SCRIPT_ADDRESS);
+            if (data.size() == hash.size() + zec_script_prefix.size() && std::equal(zec_script_prefix.begin(), zec_script_prefix.end(), data.begin())) {
+                std::copy(data.begin() + zec_script_prefix.size(), data.end(), hash.begin());
+                dest = CScriptID(hash);
+            }
+        }
+    }
+
+    return EncodeDestination(dest);
+}
+
 std::string KeyIO::EncodePaymentAddress(const libzcash::PaymentAddress& zaddr)
 {
     return std::visit(PaymentAddressEncoder(keyConstants), zaddr);

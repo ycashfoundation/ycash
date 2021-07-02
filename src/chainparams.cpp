@@ -164,6 +164,29 @@ public:
         keyConstants.bech32HRPs[SAPLING_EXTENDED_SPEND_KEY]   = "secret-extended-key-main";
         keyConstants.bech32HRPs[SAPLING_EXTENDED_FVK]         = "zxviews";
 
+        // Legacy (Zcash) prefixes, required for pre-fork founders addresses validation
+        // guarantees the first 2 characters, when base58 encoded, are "t1"
+        keyConstants.base58Prefixes[LEGACY_PUBKEY_ADDRESS]     = {0x1C,0xB8};
+        // guarantees the first 2 characters, when base58 encoded, are "t3"
+        keyConstants.base58Prefixes[LEGACY_SCRIPT_ADDRESS]     = {0x1C,0xBD};
+        // the first character, when base58 encoded, is "5" or "K" or "L" (as in Bitcoin)
+        keyConstants.base58Prefixes[LEGACY_SECRET_KEY]         = {0x80};
+        // do not rely on these BIP32 prefixes; they are not specified and may change
+        keyConstants.base58Prefixes[LEGACY_EXT_PUBLIC_KEY]     = {0x04,0x88,0xB2,0x1E};
+        keyConstants.base58Prefixes[LEGACY_EXT_SECRET_KEY]     = {0x04,0x88,0xAD,0xE4};
+        // guarantees the first 2 characters, when base58 encoded, are "zc"
+        keyConstants.base58Prefixes[LEGACY_ZCPAYMENT_ADDRESS]  = {0x16,0x9A};
+        // guarantees the first 4 characters, when base58 encoded, are "ZiVK"
+        keyConstants.base58Prefixes[LEGACY_ZCVIEWING_KEY]      = {0xA8,0xAB,0xD3};
+        // guarantees the first 2 characters, when base58 encoded, are "SK"
+        keyConstants.base58Prefixes[LEGACY_ZCSPENDING_KEY]     = {0xAB,0x36};
+
+        keyConstants.bech32HRPs[LEGACY_SAPLING_PAYMENT_ADDRESS]      = "zs";
+        keyConstants.bech32HRPs[LEGACY_SAPLING_FULL_VIEWING_KEY]     = "zviews";
+        keyConstants.bech32HRPs[LEGACY_SAPLING_INCOMING_VIEWING_KEY] = "zivks";
+        keyConstants.bech32HRPs[LEGACY_SAPLING_EXTENDED_SPEND_KEY]   = "secret-extended-key-main";
+        keyConstants.bech32HRPs[LEGACY_SAPLING_EXTENDED_FVK]         = "zxviews";
+
         // The best chain should have at least this much work.
         consensus.nMinimumChainWork = uint256S("0000000000000000000000000000000000000000000000000152d411d731d250");
 
@@ -230,7 +253,7 @@ public:
         fZIP209Enabled = true;
         hashSproutValuePoolCheckpointBlock = uint256S("0000000000c7b46b6bc04b4cbf87d8bb08722aebd51232619b214f7273f8460e");
 
-        // Founders reward script expects a vector of 2-of-3 multisig addresses
+        // Pre-fork founders reward script expects a vector of 2-of-3 multisig addresses
         vFoundersRewardAddress = {
             "t3Vz22vK5z2LcKEdg16Yv4FFneEL1zg9ojd", /* main-index: 0*/
             "t3cL9AucCajm3HXDhb5jBnJK2vapVoXsop3", /* main-index: 1*/
@@ -397,6 +420,29 @@ public:
         keyConstants.bech32HRPs[SAPLING_INCOMING_VIEWING_KEY] = "zivktestsapling";
         keyConstants.bech32HRPs[SAPLING_EXTENDED_SPEND_KEY]   = "secret-extended-key-test";
         keyConstants.bech32HRPs[SAPLING_EXTENDED_FVK]         = "zxviewtestsapling";
+
+        // Legacy (Zcash) prefixes, required for pre-fork founders addresses validation
+        // guarantees the first 2 characters, when base58 encoded, are "tm"
+        keyConstants.base58Prefixes[LEGACY_PUBKEY_ADDRESS]     = {0x1D,0x25};
+        // guarantees the first 2 characters, when base58 encoded, are "t2"
+        keyConstants.base58Prefixes[LEGACY_SCRIPT_ADDRESS]     = {0x1C,0xBA};
+        // the first character, when base58 encoded, is "9" or "c" (as in Bitcoin)
+        keyConstants.base58Prefixes[LEGACY_SECRET_KEY]         = {0xEF};
+        // do not rely on these BIP32 prefixes; they are not specified and may change
+        keyConstants.base58Prefixes[LEGACY_EXT_PUBLIC_KEY]     = {0x04,0x35,0x87,0xCF};
+        keyConstants.base58Prefixes[LEGACY_EXT_SECRET_KEY]     = {0x04,0x35,0x83,0x94};
+        // guarantees the first 2 characters, when base58 encoded, are "zt"
+        keyConstants.base58Prefixes[LEGACY_ZCPAYMENT_ADDRESS]  = {0x16,0xB6};
+        // guarantees the first 4 characters, when base58 encoded, are "ZiVt"
+        keyConstants.base58Prefixes[LEGACY_ZCVIEWING_KEY]      = {0xA8,0xAC,0x0C};
+        // guarantees the first 2 characters, when base58 encoded, are "ST"
+        keyConstants.base58Prefixes[LEGACY_ZCSPENDING_KEY]     = {0xAC,0x08};
+
+        keyConstants.bech32HRPs[LEGACY_SAPLING_PAYMENT_ADDRESS]      = "ztestsapling";
+        keyConstants.bech32HRPs[LEGACY_SAPLING_FULL_VIEWING_KEY]     = "zviewtestsapling";
+        keyConstants.bech32HRPs[LEGACY_SAPLING_INCOMING_VIEWING_KEY] = "zivktestsapling";
+        keyConstants.bech32HRPs[LEGACY_SAPLING_EXTENDED_SPEND_KEY]   = "secret-extended-key-test";
+        keyConstants.bech32HRPs[LEGACY_SAPLING_EXTENDED_FVK]         = "zxviewtestsapling";
 
         // On testnet we activate this rule 6 blocks after Blossom activation. From block 299188 and
         // prior to Blossom activation, the testnet minimum-difficulty threshold was 15 minutes (i.e.
@@ -583,6 +629,24 @@ public:
         keyConstants.bech32HRPs[SAPLING_EXTENDED_SPEND_KEY]   = "secret-extended-key-regtest";
         keyConstants.bech32HRPs[SAPLING_EXTENDED_FVK]         = "zxviewregtestsapling";
 
+        // Legacy (Zcash) prefixes, required for pre-fork founders addresses validation
+        // These prefixes are the same as the testnet prefixes
+        keyConstants.base58Prefixes[LEGACY_PUBKEY_ADDRESS]     = {0x1D,0x25};
+        keyConstants.base58Prefixes[LEGACY_SCRIPT_ADDRESS]     = {0x1C,0xBA};
+        keyConstants.base58Prefixes[LEGACY_SECRET_KEY]         = {0xEF};
+        // do not rely on these BIP32 prefixes; they are not specified and may change
+        keyConstants.base58Prefixes[LEGACY_EXT_PUBLIC_KEY]     = {0x04,0x35,0x87,0xCF};
+        keyConstants.base58Prefixes[LEGACY_EXT_SECRET_KEY]     = {0x04,0x35,0x83,0x94};
+        keyConstants.base58Prefixes[LEGACY_ZCPAYMENT_ADDRESS]  = {0x16,0xB6};
+        keyConstants.base58Prefixes[LEGACY_ZCVIEWING_KEY]      = {0xA8,0xAC,0x0C};
+        keyConstants.base58Prefixes[LEGACY_ZCSPENDING_KEY]     = {0xAC,0x08};
+
+        keyConstants.bech32HRPs[LEGACY_SAPLING_PAYMENT_ADDRESS]      = "zregtestsapling";
+        keyConstants.bech32HRPs[LEGACY_SAPLING_FULL_VIEWING_KEY]     = "zviewregtestsapling";
+        keyConstants.bech32HRPs[LEGACY_SAPLING_INCOMING_VIEWING_KEY] = "zivkregtestsapling";
+        keyConstants.bech32HRPs[LEGACY_SAPLING_EXTENDED_SPEND_KEY]   = "secret-extended-key-regtest";
+        keyConstants.bech32HRPs[LEGACY_SAPLING_EXTENDED_FVK]         = "zxviewregtestsapling";
+
         // The best chain should have at least this much work.
         consensus.nMinimumChainWork = uint256S("0x00");
 
@@ -695,6 +759,7 @@ void SelectParams(const std::string& network)
 std::string CChainParams::GetFoundersRewardAddressAtHeight(int nHeight) const {
     // Pre YCash
     if (!this->GetConsensus().NetworkUpgradeActive(nHeight, Consensus::UPGRADE_YCASH)) {
+        KeyIO keyIO(*this);
         int preBlossomMaxHeight = consensus.GetLastFoundersRewardBlockHeight(0);
         // zip208
         // FounderAddressAdjustedHeight(height) :=
@@ -708,7 +773,7 @@ std::string CChainParams::GetFoundersRewardAddressAtHeight(int nHeight) const {
         assert(nHeight > 0 && nHeight <= preBlossomMaxHeight);
         size_t addressChangeInterval = (preBlossomMaxHeight + vFoundersRewardAddress.size()) / vFoundersRewardAddress.size();
         size_t i = nHeight / addressChangeInterval;
-        return vFoundersRewardAddress[i];
+        return keyIO.ZecToYec(vFoundersRewardAddress[i]);
     } else {
         // Ycash 
         // Make sure we have at least 48 addresses  (approx 4 years worth)
@@ -754,9 +819,9 @@ CScript CChainParams::GetFoundersRewardScriptAtHeight(int nHeight) const {
 
 std::string CChainParams::GetZcashFoundersRewardAddressAtIndex(int i) const {
     assert(i >= 0 && i < vFoundersRewardAddress.size());
-    return vFoundersRewardAddress[i];
+    KeyIO keyIO(*this);
+    return keyIO.ZecToYec(vFoundersRewardAddress[i]);
 }
-
 
 std::string CChainParams::GetYcashFoundersRewardAddressAtIndex(int i) const {
     assert(i >= 0 && i < vYcashFoundersRewardAddress.size());
