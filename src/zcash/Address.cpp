@@ -28,6 +28,10 @@ bool IsValidPaymentAddress(const libzcash::PaymentAddress& zaddr) {
     return !std::holds_alternative<libzcash::InvalidEncoding>(zaddr);
 }
 
+bool IsValidSaplingAddress(const libzcash::PaymentAddress& zaddr) {
+    return std::holds_alternative<libzcash::SaplingPaymentAddress>(zaddr);
+}
+
 bool IsValidViewingKey(const libzcash::ViewingKey& vk) {
     return !std::holds_alternative<libzcash::InvalidEncoding>(vk);
 }
