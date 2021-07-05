@@ -1167,3 +1167,144 @@ UniValue z_exportviewingkey(const UniValue& params, bool fHelp)
         throw JSONRPCError(RPC_WALLET_ERROR, "Wallet does not hold private key or viewing key for this zaddr");
     }
 }
+
+UniValue z_exportivk(const UniValue& params, bool fHelp)
+{
+    if (!EnsureWalletIsAvailable(fHelp))
+        return NullUniValue;
+
+    if (fHelp || params.size() != 1)
+        throw runtime_error(
+            "z_exportivk \"zaddr\"\n"
+            "\nReveals the incoming viewing key corresponding to Sapling 'zaddr'.\n"
+            "Then the z_importivk can be used with this output\n"
+            "\nArguments:\n"
+            "1. \"zaddr\"   (string, required) The Sapling zaddr for the viewing key\n"
+            "\nResult:\n"
+            "\"vkey\"                  (string) The viewing key\n"
+            "\nExamples:\n"
+            + HelpExampleCli("z_exportivk", "\"myaddress\"")
+            + HelpExampleRpc("z_exportivk", "\"myaddress\"")
+        );
+
+    LOCK2(cs_main, pwalletMain->cs_wallet);
+
+    EnsureWalletIsUnlocked();
+
+    string strAddress = params[0].get_str();
+
+    KeyIO keyIO(Params());
+    auto address = keyIO.DecodePaymentAddress(strAddress);
+    if (!IsValidPaymentAddress(address) || !IsValidSaplingAddress(address)) {
+        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid Sapling zaddr");
+    }
+
+    auto spa = std::get<libzcash::SaplingPaymentAddress>(address);
+    libzcash::SaplingIncomingViewingKey ivk;
+    if (!pwalletMain->GetSaplingIncomingViewingKey(spa, ivk)) {
+        throw JSONRPCError(RPC_WALLET_ERROR, "Wallet does not hold viewing key for this zaddr");
+    } else {
+        return keyIO.EncodeIVK(ivk);
+    }
+}
+
+UniValue z_importivk(const UniValue& params, bool fHelp)
+{
+    if (!EnsureWalletIsAvailable(fHelp))
+        return NullUniValue;
+
+    if (fHelp || params.size() < 1 || params.size() > 4)
+        throw runtime_error(
+            "z_importivk \"vkey\" ( rescan startHeight )\n"
+            "\nAdds a viewing key (as returned by z_exportivk) to your wallet.\n"
+            "\nArguments:\n"
+            "1. \"vkey\"             (string, required) The viewing key (see z_exportivk)\n"
+            "2. rescan             (string, optional, default=\"whenkeyisnew\") Rescan the wallet for transactions - can be \"yes\", \"no\" or \"whenkeyisnew\"\n"
+            "3. startHeight        (numeric, optional, default=0) Block height to start rescan from\n"
+            "4. zaddr               (string, optional, default=\"\") zaddr in case of importing viewing key for Sapling\n"
+            "\nNote: This call can take minutes to complete if rescan is true.\n"
+            "\nExamples:\n"
+            "\nImport an incoming viewing key\n"
+            + HelpExampleCli("z_importivk", "\"vkey\"") +
+            "\nImport the incoming viewing key without rescan\n"
+            + HelpExampleCli("z_importivk", "\"vkey\" no") +
+            "\nImport the incoming viewing key with partial rescan\n"
+            + HelpExampleCli("z_importivk", "\"vkey\" whenkeyisnew 30000") +
+            "\nRe-import the viewing key with longer partial rescan\n"
+            + HelpExampleCli("z_importivk", "\"vkey\" yes 20000") +
+            "\nImport the incoming viewing key for Sapling address\n"
+            + HelpExampleCli("z_importivk", "\"vkey\" no 0 \"zaddr\"") +
+            "\nAs a JSON-RPC call\n"
+            + HelpExampleRpc("z_importivk", "\"vkey\", \"no\"")
+        );
+
+    LOCK2(cs_main, pwalletMain->cs_wallet);
+
+    EnsureWalletIsUnlocked();
+
+    // Whether to perform rescan after import
+    bool fRescan = true;
+    bool fIgnoreExistingKey = true;
+    if (params.size() > 1) {
+        auto rescan = params[1].get_str();
+        if (rescan.compare("whenkeyisnew") != 0) {
+            fIgnoreExistingKey = false;
+            if (rescan.compare("no") == 0) {
+                fRescan = false;
+            } else if (rescan.compare("yes") != 0) {
+                throw JSONRPCError(
+                    RPC_INVALID_PARAMETER,
+                    "rescan must be \"yes\", \"no\" or \"whenkeyisnew\"");
+            }
+        }
+    }
+
+    // Height to rescan from
+    int nRescanHeight = 0;
+    if (params.size() > 2) {
+        nRescanHeight = params[2].get_int();
+    }
+    if (nRescanHeight < 0 || nRescanHeight > chainActive.Height()) {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Block height out of range");
+    }
+
+    string strIVKey = params[0].get_str();
+    KeyIO keyIO(Params());
+    auto ivk = keyIO.DecodeIVK(strIVKey);
+    if (ivk.IsNull()) {
+        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid incoming viewing key");
+    }
+
+    if (params.size() < 4) {
+        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Missing zaddr for Sapling viewing key.");
+    }
+    string strAddress = params[3].get_str();
+    auto address = keyIO.DecodePaymentAddress(strAddress);
+    if (!IsValidSaplingAddress(address)) {
+        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid Sapling zaddr");
+    }
+
+    auto addr = std::get<libzcash::SaplingPaymentAddress>(address);
+
+    if (!(addr == ivk.address(addr.d))) {
+        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Zaddr and viewing key are not consistent.");
+    }
+
+    if (pwalletMain->HaveSaplingIncomingViewingKey(addr)) {
+        if (fIgnoreExistingKey) {
+            return NullUniValue;
+        }
+    } else {
+        pwalletMain->MarkDirty();
+
+        if (!pwalletMain->AddSaplingIncomingViewingKey(ivk, addr)) {
+            throw JSONRPCError(RPC_WALLET_ERROR, "Error adding viewing key to wallet");
+        }
+    }
+
+    // We want to scan for transactions and notes
+    if (fRescan) {
+        pwalletMain->ScanForWalletTransactions(chainActive[nRescanHeight], true);
+    }
+    return NullUniValue;
+}

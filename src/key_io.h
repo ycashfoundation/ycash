@@ -45,6 +45,9 @@ public:
     std::string EncodeViewingKey(const libzcash::ViewingKey& vk);
     libzcash::ViewingKey DecodeViewingKey(const std::string& str);
 
+    std::string EncodeIVK(const libzcash::SaplingIncomingViewingKey& ivk);
+    libzcash::SaplingIncomingViewingKey DecodeIVK(const std::string& str);
+
     std::string EncodeSpendingKey(const libzcash::SpendingKey& zkey);
     libzcash::SpendingKey DecodeSpendingKey(const std::string& str);
 };

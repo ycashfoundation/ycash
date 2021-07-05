@@ -361,6 +361,45 @@ std::string KeyIO::EncodeViewingKey(const libzcash::ViewingKey& vk)
     return std::visit(ViewingKeyEncoder(keyConstants), vk);
 }
 
+std::string KeyIO::EncodeIVK(const libzcash::SaplingIncomingViewingKey& ivk)
+{
+    CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
+    ss << ivk;
+    // ConvertBits requires unsigned char, but CDataStream uses char
+    std::vector<unsigned char> serkey(ss.begin(), ss.end());
+    std::vector<unsigned char> data;
+    // See calculation comment below
+    data.reserve((serkey.size() * 8 + 4) / 5);
+    ConvertBits<8, 5, true>([&](unsigned char c) { data.push_back(c); }, serkey.begin(), serkey.end());
+    std::string ret = bech32::Encode(keyConstants.Bech32HRP(KeyConstants::SAPLING_INCOMING_VIEWING_KEY), data);
+    memory_cleanse(serkey.data(), serkey.size());
+    memory_cleanse(data.data(), data.size());
+    return ret;
+}
+
+libzcash::SaplingIncomingViewingKey KeyIO::DecodeIVK(const std::string& str)
+{
+    std::vector<unsigned char> data;
+    auto bech = bech32::Decode(str);
+    if (bech.first == keyConstants.Bech32HRP(KeyConstants::SAPLING_INCOMING_VIEWING_KEY) &&
+        bech.second.size() == ConvertedSaplingIncomingViewingKeySize) {
+        // Bech32 decoding
+        data.reserve((bech.second.size() * 5) / 8);
+        if (ConvertBits<5, 8, false>([&](unsigned char c) { data.push_back(c); }, bech.second.begin(), bech.second.end())) {
+            CDataStream ss(data, SER_NETWORK, PROTOCOL_VERSION);
+            libzcash::SaplingIncomingViewingKey ret;
+            ss >> ret;
+            memory_cleanse(data.data(), data.size());
+            return ret;
+        }
+    }
+
+    memory_cleanse(data.data(), data.size());
+    libzcash::SaplingIncomingViewingKey ret;
+    ret.SetNull();
+    return ret;
+}
+
 libzcash::ViewingKey KeyIO::DecodeViewingKey(const std::string& str)
 {
     return DecodeAny<libzcash::ViewingKey,

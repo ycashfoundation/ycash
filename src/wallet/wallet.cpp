@@ -1534,30 +1534,33 @@ void CWallet::UpdateSaplingNullifierNoteMapWithTx(CWalletTx& wtx) {
         }
         else {
             uint64_t position = nd.witnesses.front().position();
-            auto extfvk = mapSaplingFullViewingKeys.at(nd.ivk);
-            OutputDescription output = wtx.vShieldedOutput[op.n];
+            // Skip if we only have incoming viewing key
+            if (mapSaplingFullViewingKeys.count(nd.ivk) != 0) {
+                auto extfvk = mapSaplingFullViewingKeys.at(nd.ivk);
+                OutputDescription output = wtx.vShieldedOutput[op.n];
 
-            auto optDeserialized = SaplingNotePlaintext::attempt_sapling_enc_decryption_deserialization(output.encCiphertext, nd.ivk, output.ephemeralKey);
+                auto optDeserialized = SaplingNotePlaintext::attempt_sapling_enc_decryption_deserialization(output.encCiphertext, nd.ivk, output.ephemeralKey);
 
-            // The transaction would not have entered the wallet unless
-            // its plaintext had been successfully decrypted previously.
-            assert(optDeserialized != std::nullopt);
+                // The transaction would not have entered the wallet unless
+                // its plaintext had been successfully decrypted previously.
+                assert(optDeserialized != std::nullopt);
 
-            auto optPlaintext = SaplingNotePlaintext::plaintext_checks_without_height(*optDeserialized, nd.ivk, output.ephemeralKey, output.cmu);
+                auto optPlaintext = SaplingNotePlaintext::plaintext_checks_without_height(*optDeserialized, nd.ivk, output.ephemeralKey, output.cmu);
 
-            // An item in mapSaplingNoteData must have already been successfully decrypted,
-            // otherwise the item would not exist in the first place.
-            assert(optPlaintext != std::nullopt);
+                // An item in mapSaplingNoteData must have already been successfully decrypted,
+                // otherwise the item would not exist in the first place.
+                assert(optPlaintext != std::nullopt);
 
-            auto optNote = optPlaintext.value().note(nd.ivk);
-            assert(optNote != std::nullopt);
+                auto optNote = optPlaintext.value().note(nd.ivk);
+                assert(optNote != std::nullopt);
 
-            auto optNullifier = optNote.value().nullifier(extfvk.fvk, position);
-            // This should not happen.  If it does, maybe the position has been corrupted or miscalculated?
-            assert(optNullifier != std::nullopt);
-            uint256 nullifier = optNullifier.value();
-            mapSaplingNullifiersToNotes[nullifier] = op;
-            item.second.nullifier = nullifier;
+                auto optNullifier = optNote.value().nullifier(extfvk.fvk, position);
+                // This should not happen.  If it does, maybe the position has been corrupted or miscalculated?
+                assert(optNullifier != std::nullopt);
+                uint256 nullifier = optNullifier.value();
+                mapSaplingNullifiersToNotes[nullifier] = op;
+                item.second.nullifier = nullifier;
+            }
         }
     }
 }

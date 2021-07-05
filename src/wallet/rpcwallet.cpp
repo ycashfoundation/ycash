@@ -5216,6 +5216,8 @@ extern UniValue z_importkey(const UniValue& params, bool fHelp);
 extern UniValue getrescaninfo(const UniValue& params, bool fHelp);
 extern UniValue z_exportviewingkey(const UniValue& params, bool fHelp);
 extern UniValue z_importviewingkey(const UniValue& params, bool fHelp);
+extern UniValue z_exportivk(const UniValue& params, bool fHelp);
+extern UniValue z_importivk(const UniValue& params, bool fHelp);
 extern UniValue z_exportwallet(const UniValue& params, bool fHelp);
 extern UniValue z_importwallet(const UniValue& params, bool fHelp);
 
@@ -5294,6 +5296,8 @@ static const CRPCCommand commands[] =
     { "wallet",             "z_importkey",                  &z_importkey,              true  },
     { "wallet",             "z_exportviewingkey",           &z_exportviewingkey,       true  },
     { "wallet",             "z_importviewingkey",           &z_importviewingkey,       true  },
+    { "wallet",             "z_exportivk",                  &z_exportivk,              true  },
+    { "wallet",             "z_importivk",                  &z_importivk,              true  },
     { "wallet",             "z_exportwallet",               &z_exportwallet,           true  },
     { "wallet",             "z_importwallet",               &z_importwallet,           true  },
     { "wallet",             "z_viewtransaction",            &z_viewtransaction,        false },
