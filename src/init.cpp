@@ -346,7 +346,7 @@ std::string HelpMessage(HelpMessageMode mode)
     strUsage += HelpMessageOpt("-dbcache=<n>", strprintf(_("Set database cache size in megabytes (%d to %d, default: %d)"), nMinDbCache, nMaxDbCache, nDefaultDbCache));
     strUsage += HelpMessageOpt("-debuglogfile=<file>", strprintf(_("Specify location of debug log file: this can be an absolute path or a path relative to the data directory (default: %s)"), DEFAULT_DEBUGLOGFILE));
     strUsage += HelpMessageOpt("-exportdir=<dir>", _("Specify directory to be used when exporting data"));
-    strUsage += HelpMessageOpt("-ibdskiptxverification", strprintf(_("Skip transaction verification during initial block download up to the last checkpoint height. Incompatible with flags that disable checkpoints. (default = %u)"), DEFAULT_IBD_SKIP_TX_VERIFICATION));
+    strUsage += HelpMessageOpt("-ibdskiptxverification", strprintf(_("Skip transaction verification during initial block download up to the last checkpoint height (a.k.a. -fastsync). Incompatible with flags that disable checkpoints. (default = %u)"), DEFAULT_IBD_SKIP_TX_VERIFICATION));
     strUsage += HelpMessageOpt("-loadblock=<file>", _("Imports blocks from external blk000??.dat file on startup"));
     strUsage += HelpMessageOpt("-maxorphantx=<n>", strprintf(_("Keep at most <n> unconnectable transactions in memory (default: %u)"), DEFAULT_MAX_ORPHAN_TRANSACTIONS));
     strUsage += HelpMessageOpt("-par=<n>", strprintf(_("Set the number of script verification threads (%u to %d, 0 = auto, <0 = leave that many cores free, default: %d)"),
@@ -361,7 +361,7 @@ std::string HelpMessage(HelpMessageMode mode)
 #ifndef WIN32
     strUsage += HelpMessageOpt("-sysperms", _("Create new files with system default permissions, instead of umask 077 (only effective with disabled wallet functionality)"));
 #endif
-    strUsage += HelpMessageOpt("-fastsync", _("Do a faster, PoW-only verification of blocks during initial block download"));
+    strUsage += HelpMessageOpt("-fastsync", _("Do a faster, PoW-only verification of blocks during initial block download (a.k.a. -ibdskiptxverification"));
     strUsage += HelpMessageOpt("-txexpirynotify=<cmd>", _("Execute command when transaction expires (%s in cmd is replaced by transaction id)"));
     strUsage += HelpMessageOpt("-txindex", strprintf(_("Maintain a full transaction index, used by the getrawtransaction rpc call (default: %u)"), DEFAULT_TXINDEX));
 
@@ -970,9 +970,10 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
 
     // ensure that the user has not disabled checkpoints when requesting to
     // skip transaction verification in initial block download.
-    if (GetBoolArg("-ibdskiptxverification", DEFAULT_IBD_SKIP_TX_VERIFICATION)) {
+    if (GetBoolArg("-ibdskiptxverification", DEFAULT_IBD_SKIP_TX_VERIFICATION)
+        || GetBoolArg("-fastsync", DEFAULT_IBD_SKIP_TX_VERIFICATION)) {
         if (!GetBoolArg("-checkpoints", DEFAULT_CHECKPOINTS_ENABLED)) {
-            return InitError(_("-ibdskiptxverification requires checkpoints to be enabled; it is incompatible with flags that disable checkpoints"));
+            return InitError(_("-ibdskiptxverification (or -fastsync) requires checkpoints to be enabled; it is incompatible with flags that disable checkpoints"));
         }
     }
 
@@ -1017,7 +1018,8 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
     mempool.SetMempoolCostLimit(mempoolTotalCostLimit, mempoolEvictionMemorySeconds);
 
     fCheckBlockIndex = GetBoolArg("-checkblockindex", chainparams.DefaultConsistencyChecks());
-    fIBDSkipTxVerification = GetBoolArg("-ibdskiptxverification", DEFAULT_IBD_SKIP_TX_VERIFICATION);
+    fIBDSkipTxVerification = GetBoolArg("-ibdskiptxverification", DEFAULT_IBD_SKIP_TX_VERIFICATION)
+        || GetBoolArg("-fastsync", DEFAULT_IBD_SKIP_TX_VERIFICATION);
     fCheckpointsEnabled = GetBoolArg("-checkpoints", DEFAULT_CHECKPOINTS_ENABLED);
 
     // -par=0 means autodetect, but nScriptCheckThreads==0 means no concurrency

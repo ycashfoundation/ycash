@@ -2706,7 +2706,7 @@ static int64_t nTimeTotal = 0;
  * Returns `false` (allowing transaction checks to be skipped) only if all
  * of the following are true:
  *   - we're currently in initial block download
- *   - the `-ibdskiptxverification` flag is set
+ *   - the `-ibdskiptxverification` flag is set or the `-fastsync` flag is set
  *   - the block under inspection is an ancestor of the latest checkpoint.
  */
 static bool ShouldCheckTransactions(const CChainParams& chainparams, const CBlockIndex* pindex) {
@@ -2732,7 +2732,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
     auto verifier = fExpensiveChecks ? ProofVerifier::Strict() : ProofVerifier::Disabled();
 
     // If in initial block download, and this block is an ancestor of a checkpoint,
-    // and -ibdskiptxverification is set, disable all transaction checks.
+    // and -ibdskiptxverification (or -fastsync) is set, disable all transaction checks.
     bool fCheckTransactions = ShouldCheckTransactions(chainparams, pindex);
 
     // Check it again to verify JoinSplit proofs, and in case a previous version let a bad block in
@@ -4186,14 +4186,8 @@ bool CheckBlock(const CBlock& block,
             return state.DoS(100, error("CheckBlock(): more than one coinbase"),
                              REJECT_INVALID, "bad-cb-multiple");
 
-    // skip all transaction checks if this flag is not set
+    // skip all transaction checks if this flag is not set (see -ibdskiptxverification or -fastsync flag)
     if (!fCheckTransactions) return true;
-
-    // If this is initial block download and "fastsync" is set, we'll skip verifying the transactions
-    if (IsInitialBlockDownload(chainparams.GetConsensus()) && GetBoolArg("-fastsync", false)) {
-        LogPrintf("fastsync: Skipping tx checks\n");
-        return true;
-    }
 
     // Check transactions
     for (const CTransaction& tx : block.vtx)
@@ -4376,16 +4370,7 @@ bool ContextualCheckBlock(
         }
     }
 
-    // If this is initial block download and "fastsync" is set, we'll skip verifying the transactions
-    if (IsInitialBlockDownload(chainparams.GetConsensus()) && GetBoolArg("-fastsync", false)) {
-        // The method is called GetTotalBlocksEstimate, but it really returns the last checkpoint block height
-        if (fCheckpointsEnabled &&
-                nHeight < Checkpoints::GetTotalBlocksEstimate(Params().Checkpoints())) {  
-            LogPrintf("fastsync: Skipping tx checks for %d\n", nHeight);
-            return true;
-        }
-    }
-
+    
     // Check that all transactions are finalized
     BOOST_FOREACH(const CTransaction& tx, block.vtx) {
 
