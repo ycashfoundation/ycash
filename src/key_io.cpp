@@ -356,6 +356,20 @@ bool KeyIO::IsValidPaymentAddressString(const std::string& str) {
     return IsValidPaymentAddress(DecodePaymentAddress(str));
 }
 
+std::string KeyIO::ZecToYecShielded(const std::string& str)
+{
+    libzcash::PaymentAddress zaddr = DecodeAny<libzcash::PaymentAddress,
+        libzcash::SproutPaymentAddress,
+        libzcash::SaplingPaymentAddress>(
+            keyConstants,
+            str,
+            std::make_pair(KeyConstants::LEGACY_ZCPAYMENT_ADDRESS, libzcash::SerializedSproutPaymentAddressSize),
+            std::make_pair(KeyConstants::LEGACY_SAPLING_PAYMENT_ADDRESS, ConvertedSaplingPaymentAddressSize)
+        );
+
+    return EncodePaymentAddress(zaddr);
+}
+
 std::string KeyIO::EncodeViewingKey(const libzcash::ViewingKey& vk)
 {
     return std::visit(ViewingKeyEncoder(keyConstants), vk);

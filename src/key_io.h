@@ -37,6 +37,7 @@ public:
     bool IsValidDestinationString(const std::string& str);
 
     std::string ZecToYec(const std::string& str);
+    std::string ZecToYecShielded(const std::string& str);
 
     std::string EncodePaymentAddress(const libzcash::PaymentAddress& zaddr);
     libzcash::PaymentAddress DecodePaymentAddress(const std::string& str);
