@@ -56,7 +56,8 @@ CMutableTransaction GetValidTransaction(uint32_t consensusBranchId=SPROUT_BRANCH
         mtx.fOverwintered = true;
         mtx.nVersionGroupId = OVERWINTER_VERSION_GROUP_ID;
         mtx.nVersion = OVERWINTER_TX_VERSION;
-    } else if (consensusBranchId == NetworkUpgradeInfo[Consensus::UPGRADE_SAPLING].nBranchId) {
+    } else if (consensusBranchId == NetworkUpgradeInfo[Consensus::UPGRADE_SAPLING].nBranchId
+        || consensusBranchId == NetworkUpgradeInfo[Consensus::UPGRADE_YCASH].nBranchId) {
         mtx.fOverwintered = true;
         mtx.nVersionGroupId = SAPLING_VERSION_GROUP_ID;
         mtx.nVersion = SAPLING_TX_VERSION;
@@ -538,19 +539,21 @@ TEST(ChecktransactionTests, JoinsplitSignatureDetectsOldBranchId) {
     SelectParams(CBaseChainParams::REGTEST);
     UpdateNetworkUpgradeParameters(Consensus::UPGRADE_OVERWINTER, 1);
     UpdateNetworkUpgradeParameters(Consensus::UPGRADE_SAPLING, 1);
+    UpdateNetworkUpgradeParameters(Consensus::UPGRADE_YCASH, 3);
     UpdateNetworkUpgradeParameters(Consensus::UPGRADE_BLOSSOM, 10);
     UpdateNetworkUpgradeParameters(Consensus::UPGRADE_HEARTWOOD, 20);
     auto chainparams = Params();
 
     auto saplingBranchId = NetworkUpgradeInfo[Consensus::UPGRADE_SAPLING].nBranchId;
+    auto ycashBranchId = NetworkUpgradeInfo[Consensus::UPGRADE_YCASH].nBranchId;
     auto blossomBranchId = NetworkUpgradeInfo[Consensus::UPGRADE_BLOSSOM].nBranchId;
 
-    // Create a valid transaction for the Sapling epoch.
-    CMutableTransaction mtx = GetValidTransaction(saplingBranchId);
+    // Create a valid transaction for the Ycash epoch.
+    CMutableTransaction mtx = GetValidTransaction(ycashBranchId);
     CTransaction tx(mtx);
 
     MockCValidationState state;
-    // Ensure that the transaction validates against Sapling.
+    // Ensure that the transaction validates against Ycash upgrade.
     EXPECT_TRUE(ContextualCheckTransaction(
         tx, state, chainparams, 5, false,
         [](const Consensus::Params&) { return false; }));
@@ -561,7 +564,7 @@ TEST(ChecktransactionTests, JoinsplitSignatureDetectsOldBranchId) {
         10, false, REJECT_INVALID,
         strprintf("old-consensus-branch-id (Expected %s, found %s)",
             HexInt(blossomBranchId),
-            HexInt(saplingBranchId)),
+            HexInt(ycashBranchId)),
         false)).Times(1);
     EXPECT_FALSE(ContextualCheckTransaction(
         tx, state, chainparams, 15, false,

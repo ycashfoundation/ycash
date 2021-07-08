@@ -213,6 +213,7 @@ const CChainParams& RegtestActivateBlossom(bool updatePow, int blossomActivation
     SelectParams(CBaseChainParams::REGTEST);
     UpdateNetworkUpgradeParameters(Consensus::UPGRADE_OVERWINTER, Consensus::NetworkUpgrade::ALWAYS_ACTIVE);
     UpdateNetworkUpgradeParameters(Consensus::UPGRADE_SAPLING, Consensus::NetworkUpgrade::ALWAYS_ACTIVE);
+    UpdateNetworkUpgradeParameters(Consensus::UPGRADE_YCASH, Consensus::NetworkUpgrade::ALWAYS_ACTIVE);
     UpdateNetworkUpgradeParameters(Consensus::UPGRADE_BLOSSOM, blossomActivationHeight);
     if (updatePow) {
         UpdateRegtestPow(32, 16, uint256S("0007ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"), false);
@@ -223,6 +224,7 @@ const CChainParams& RegtestActivateBlossom(bool updatePow, int blossomActivation
 void RegtestDeactivateBlossom() {
     UpdateRegtestPow(0, 0, uint256S("0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f"), true);
     UpdateNetworkUpgradeParameters(Consensus::UPGRADE_BLOSSOM, Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT);
+    UpdateNetworkUpgradeParameters(Consensus::UPGRADE_YCASH, Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT);
     UpdateNetworkUpgradeParameters(Consensus::UPGRADE_SAPLING, Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT);
     UpdateNetworkUpgradeParameters(Consensus::UPGRADE_OVERWINTER, Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT);
     SelectParams(CBaseChainParams::MAIN);
@@ -232,6 +234,7 @@ const Consensus::Params& RegtestActivateHeartwood(bool updatePow, int heartwoodA
     SelectParams(CBaseChainParams::REGTEST);
     UpdateNetworkUpgradeParameters(Consensus::UPGRADE_OVERWINTER, Consensus::NetworkUpgrade::ALWAYS_ACTIVE);
     UpdateNetworkUpgradeParameters(Consensus::UPGRADE_SAPLING, Consensus::NetworkUpgrade::ALWAYS_ACTIVE);
+    UpdateNetworkUpgradeParameters(Consensus::UPGRADE_YCASH, Consensus::NetworkUpgrade::ALWAYS_ACTIVE);
     UpdateNetworkUpgradeParameters(Consensus::UPGRADE_BLOSSOM, Consensus::NetworkUpgrade::ALWAYS_ACTIVE);
     UpdateNetworkUpgradeParameters(Consensus::UPGRADE_HEARTWOOD, heartwoodActivationHeight);
     if (updatePow) {
@@ -244,6 +247,7 @@ void RegtestDeactivateHeartwood() {
     UpdateRegtestPow(0, 0, uint256S("0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f"), true);
     UpdateNetworkUpgradeParameters(Consensus::UPGRADE_HEARTWOOD, Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT);
     UpdateNetworkUpgradeParameters(Consensus::UPGRADE_BLOSSOM, Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT);
+    UpdateNetworkUpgradeParameters(Consensus::UPGRADE_YCASH, Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT);
     UpdateNetworkUpgradeParameters(Consensus::UPGRADE_SAPLING, Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT);
     UpdateNetworkUpgradeParameters(Consensus::UPGRADE_OVERWINTER, Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT);
     SelectParams(CBaseChainParams::MAIN);
@@ -253,6 +257,7 @@ const Consensus::Params& RegtestActivateCanopy(bool updatePow, int canopyActivat
     SelectParams(CBaseChainParams::REGTEST);
     UpdateNetworkUpgradeParameters(Consensus::UPGRADE_OVERWINTER, Consensus::NetworkUpgrade::ALWAYS_ACTIVE);
     UpdateNetworkUpgradeParameters(Consensus::UPGRADE_SAPLING, Consensus::NetworkUpgrade::ALWAYS_ACTIVE);
+    UpdateNetworkUpgradeParameters(Consensus::UPGRADE_YCASH, Consensus::NetworkUpgrade::ALWAYS_ACTIVE);
     UpdateNetworkUpgradeParameters(Consensus::UPGRADE_BLOSSOM, Consensus::NetworkUpgrade::ALWAYS_ACTIVE);
     UpdateNetworkUpgradeParameters(Consensus::UPGRADE_HEARTWOOD, Consensus::NetworkUpgrade::ALWAYS_ACTIVE);
     UpdateNetworkUpgradeParameters(Consensus::UPGRADE_CANOPY, canopyActivationHeight);
@@ -271,6 +276,7 @@ void RegtestDeactivateCanopy() {
     UpdateNetworkUpgradeParameters(Consensus::UPGRADE_CANOPY, Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT);
     UpdateNetworkUpgradeParameters(Consensus::UPGRADE_HEARTWOOD, Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT);
     UpdateNetworkUpgradeParameters(Consensus::UPGRADE_BLOSSOM, Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT);
+    UpdateNetworkUpgradeParameters(Consensus::UPGRADE_YCASH, Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT);
     UpdateNetworkUpgradeParameters(Consensus::UPGRADE_SAPLING, Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT);
     UpdateNetworkUpgradeParameters(Consensus::UPGRADE_OVERWINTER, Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT);
     SelectParams(CBaseChainParams::MAIN);
@@ -280,6 +286,7 @@ const Consensus::Params& RegtestActivateNU5(bool updatePow, int nu5ActivationHei
     SelectParams(CBaseChainParams::REGTEST);
     UpdateNetworkUpgradeParameters(Consensus::UPGRADE_OVERWINTER, Consensus::NetworkUpgrade::ALWAYS_ACTIVE);
     UpdateNetworkUpgradeParameters(Consensus::UPGRADE_SAPLING, Consensus::NetworkUpgrade::ALWAYS_ACTIVE);
+    UpdateNetworkUpgradeParameters(Consensus::UPGRADE_YCASH, Consensus::NetworkUpgrade::ALWAYS_ACTIVE);
     UpdateNetworkUpgradeParameters(Consensus::UPGRADE_BLOSSOM, Consensus::NetworkUpgrade::ALWAYS_ACTIVE);
     UpdateNetworkUpgradeParameters(Consensus::UPGRADE_HEARTWOOD, Consensus::NetworkUpgrade::ALWAYS_ACTIVE);
     UpdateNetworkUpgradeParameters(Consensus::UPGRADE_CANOPY, Consensus::NetworkUpgrade::ALWAYS_ACTIVE);
@@ -300,6 +307,7 @@ void RegtestDeactivateNU5() {
     UpdateNetworkUpgradeParameters(Consensus::UPGRADE_CANOPY, Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT);
     UpdateNetworkUpgradeParameters(Consensus::UPGRADE_HEARTWOOD, Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT);
     UpdateNetworkUpgradeParameters(Consensus::UPGRADE_BLOSSOM, Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT);
+    UpdateNetworkUpgradeParameters(Consensus::UPGRADE_YCASH, Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT);
     UpdateNetworkUpgradeParameters(Consensus::UPGRADE_SAPLING, Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT);
     UpdateNetworkUpgradeParameters(Consensus::UPGRADE_OVERWINTER, Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT);
     SelectParams(CBaseChainParams::MAIN);

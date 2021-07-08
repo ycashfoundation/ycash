@@ -528,6 +528,48 @@ TEST(WalletTests, FindMySaplingNotes) {
     RegtestDeactivateSapling();
 }
 
+
+TEST(WalletTests, FindMySaplingNotesWithIvkOnly) {
+    auto consensusParams = RegtestActivateSapling();
+
+    TestWallet wallet;
+    LOCK(wallet.cs_wallet);
+
+    // Generate dummy Sapling address
+    auto sk = GetTestMasterSaplingSpendingKey();
+    auto expsk = sk.expsk;
+    auto extfvk = sk.ToXFVK();
+    auto pa = sk.DefaultAddress();
+    auto ivk = extfvk.fvk.in_viewing_key();
+
+    // Generate dummy Sapling note
+    auto testNote = GetTestSaplingNote(pa, 50000);
+    
+    // Generate transaction
+    auto builder = TransactionBuilder(consensusParams, 1);
+    builder.AddSaplingSpend(expsk, testNote.note, testNote.tree.root(), testNote.tree.witness());
+    builder.AddSaplingOutput(extfvk.fvk.ovk, pa, 25000, {});
+    auto tx = builder.Build().GetTxOrThrow();
+
+    // No Sapling notes can be found in tx which does not belong to the wallet
+    CWalletTx wtx {&wallet, tx};
+    ASSERT_FALSE(wallet.HaveSaplingSpendingKey(extfvk));
+    auto noteMap = wallet.FindMySaplingNotes(wtx, 1).first;
+    EXPECT_EQ(0, noteMap.size());
+
+    // Add ivk to wallet, so Sapling notes can be found
+    ASSERT_TRUE(wallet.AddSaplingIncomingViewingKey(ivk, pa));
+    ASSERT_FALSE(wallet.HaveSaplingSpendingKey(extfvk));
+    ASSERT_TRUE(wallet.HaveSaplingIncomingViewingKey(pa));
+    noteMap = wallet.FindMySaplingNotes(wtx, 1).first;
+    EXPECT_EQ(2, noteMap.size());
+
+    // Revert to default
+    RegtestDeactivateSapling();
+}
+
+/*
+
 TEST(WalletTests, FindMySaplingNotesWithIvkOnly) {
     SelectParams(CBaseChainParams::REGTEST);
     UpdateNetworkUpgradeParameters(Consensus::UPGRADE_OVERWINTER, Consensus::NetworkUpgrade::ALWAYS_ACTIVE);
@@ -535,6 +577,7 @@ TEST(WalletTests, FindMySaplingNotesWithIvkOnly) {
     auto consensusParams = Params().GetConsensus();
 
     TestWallet wallet;
+    LOCK(wallet.cs_wallet);
 
     // Generate dummy Sapling address
     std::vector<unsigned char, secure_allocator<unsigned char>> rawSeed(32);
@@ -542,13 +585,14 @@ TEST(WalletTests, FindMySaplingNotesWithIvkOnly) {
     auto sk = libzcash::SaplingExtendedSpendingKey::Master(seed);
     auto addr = sk.DefaultAddress();
     auto expsk = sk.expsk;
+    auto extfvk = sk.ToXFVK();
     auto fvk = expsk.full_viewing_key();
     auto pk = sk.DefaultAddress();
     auto ivk = fvk.in_viewing_key();
 
     // Generate dummy Sapling note
-    libzcash::SaplingNote note(pk, 50000);
-    auto cm = note.cm().get();
+    libzcash::SaplingNote note(pk, 50000, libzcash::Zip212Enabled::BeforeZip212);
+    auto cm = note.cmu().value();
     SaplingMerkleTree tree;
     tree.append(cm);
     auto anchor = tree.root();
@@ -562,22 +606,23 @@ TEST(WalletTests, FindMySaplingNotesWithIvkOnly) {
 
     // No Sapling notes can be found in tx which does not belong to the wallet
     CWalletTx wtx {&wallet, tx};
-    ASSERT_FALSE(wallet.HaveSaplingSpendingKey(fvk));
+    ASSERT_FALSE(wallet.HaveSaplingSpendingKey(extfvk));
     ASSERT_FALSE(wallet.HaveSaplingIncomingViewingKey(addr));
-    auto noteMap = wallet.FindMySaplingNotes(wtx).first;
+    auto noteMap = wallet.FindMySaplingNotes(wtx, 1).first;
     EXPECT_EQ(0, noteMap.size());
 
     // Add ivk to wallet, so Sapling notes can be found
     ASSERT_TRUE(wallet.AddSaplingIncomingViewingKey(ivk, addr));
-    ASSERT_FALSE(wallet.HaveSaplingSpendingKey(fvk));
+    ASSERT_FALSE(wallet.HaveSaplingSpendingKey(extfvk));
     ASSERT_TRUE(wallet.HaveSaplingIncomingViewingKey(addr));
-    noteMap = wallet.FindMySaplingNotes(wtx).first;
+    noteMap = wallet.FindMySaplingNotes(wtx, 1).first;
     EXPECT_EQ(2, noteMap.size());
 
     // Revert to default
     UpdateNetworkUpgradeParameters(Consensus::UPGRADE_SAPLING, Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT);
     UpdateNetworkUpgradeParameters(Consensus::UPGRADE_OVERWINTER, Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT);
 }
+*/
 
 TEST(WalletTests, FindMySproutNotes) {
     CWallet wallet;

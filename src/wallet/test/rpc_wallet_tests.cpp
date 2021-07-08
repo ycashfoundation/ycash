@@ -410,7 +410,7 @@ BOOST_AUTO_TEST_CASE(rpc_wallet_z_validateaddress)
     BOOST_CHECK_EQUAL(b, false);
 
     // This address is valid, but the spending key is not in this wallet
-    BOOST_CHECK_NO_THROW(retValue = CallRPC("z_validateaddress zcfA19SDAKRYHLoRDoShcoz4nPohqWxuHcqg8WAxsiB2jFrrs6k7oSvst3UZvMYqpMNSRBkxBsnyjjngX5L55FxMzLKach8"));
+    BOOST_CHECK_NO_THROW(retValue = CallRPC("z_validateaddress ycmffBMczunYj9SfzPmdAGD1BavT9niSMFTgWK8majm2wJuTFRVLDXWA7tToHq5yj5UpPoNS2cXDMXwMGrnG8bo2nbUVUvz"));
     resultObj = retValue.get_obj();
     b = find_value(resultObj, "isvalid").get_bool();
     BOOST_CHECK_EQUAL(b, true);
@@ -1067,9 +1067,11 @@ BOOST_AUTO_TEST_CASE(rpc_z_sendmany_parameters)
     auto pa = pwalletMain->GenerateNewSproutZKey();
     KeyIO keyIO(Params());
     std::string zaddr1 = keyIO.EncodePaymentAddress(pa);
+    /*
     BOOST_CHECK_THROW(CallRPC(string("z_sendmany tmRr6yJonqGK23UVhrKuyvTpF8qxQQjKigJ ")
             + "[{\"address\":\"" + zaddr1 + "\", \"amount\":123.456}]"), runtime_error);
-
+    */
+    BOOST_CHECK_THROW(CallRPC("z_sendmany " + keyIO.ZecToYec("tmRr6yJonqGK23UVhrKuyvTpF8qxQQjKigJ") + " [{\"address\":\"" + zaddr1 + "\", \"amount\":123.456}]"), runtime_error);
     // Mutable tx containing contextual information we need to build tx
     UniValue retValue = CallRPC("getblockcount");
     int nHeight = retValue.get_int();
@@ -1106,8 +1108,9 @@ BOOST_AUTO_TEST_CASE(rpc_z_sendmany_parameters)
 
     // Testnet payment addresses begin with 'zt'.  This test detects an incorrect prefix.
     try {
+        KeyIO keyIOmain(Params(CBaseChainParams::MAIN));
         std::vector<SendManyRecipient> recipients = { SendManyRecipient("dummy", 1*COIN, "") };
-        std::shared_ptr<AsyncRPCOperation> operation( new AsyncRPCOperation_sendmany(std::nullopt, mtx, "zcMuhvq8sEkHALuSU2i4NbNQxshSAYrpCExec45ZjtivYPbuiFPwk6WHy4SvsbeZ4siy1WheuRGjtaJmoD1J8bFqNXhsG6U", recipients, {}, 1) );
+        std::shared_ptr<AsyncRPCOperation> operation( new AsyncRPCOperation_sendmany(std::nullopt, mtx, keyIOmain.ZecToYecShielded("zcMuhvq8sEkHALuSU2i4NbNQxshSAYrpCExec45ZjtivYPbuiFPwk6WHy4SvsbeZ4siy1WheuRGjtaJmoD1J8bFqNXhsG6U"), recipients, {}, 1) );
     } catch (const UniValue& objError) {
         BOOST_CHECK( find_error(objError, "Invalid from address"));
     }
@@ -1116,7 +1119,7 @@ BOOST_AUTO_TEST_CASE(rpc_z_sendmany_parameters)
     // invokes a method on pwalletMain, which is undefined in the google test environment.
     try {
         std::vector<SendManyRecipient> recipients = { SendManyRecipient("dummy", 1*COIN, "") };
-        std::shared_ptr<AsyncRPCOperation> operation( new AsyncRPCOperation_sendmany(std::nullopt, mtx, "ztjiDe569DPNbyTE6TSdJTaSDhoXEHLGvYoUnBU1wfVNU52TEyT6berYtySkd21njAeEoh8fFJUT42kua9r8EnhBaEKqCpP", recipients, {}, 1) );
+        std::shared_ptr<AsyncRPCOperation> operation( new AsyncRPCOperation_sendmany(std::nullopt, mtx, keyIO.ZecToYecShielded("ztjiDe569DPNbyTE6TSdJTaSDhoXEHLGvYoUnBU1wfVNU52TEyT6berYtySkd21njAeEoh8fFJUT42kua9r8EnhBaEKqCpP"), recipients, {}, 1) );
     } catch (const UniValue& objError) {
         BOOST_CHECK( find_error(objError, "no spending key found for zaddr"));
     }
@@ -1274,9 +1277,9 @@ BOOST_AUTO_TEST_CASE(rpc_z_sendmany_internals)
     // add_taddr_outputs_to_tx() will append many vouts to a raw transaction
     {
         std::vector<SendManyRecipient> recipients = {
-            SendManyRecipient("tmTGScYwiLMzHe4uGZtBYmuqoW4iEoYNMXt", 123000000, ""),
-            SendManyRecipient("tmUSbHz3vxnwLvRyNDXbwkZxjVyDodMJEhh", 456000000, ""),
-            SendManyRecipient("tmYZAXYPCP56Xa5JQWWPZuK7o7bfUQW6kkd", 789000000, ""),
+            SendManyRecipient(keyIO.ZecToYec("tmTGScYwiLMzHe4uGZtBYmuqoW4iEoYNMXt"), 123000000, ""),
+            SendManyRecipient(keyIO.ZecToYec("tmUSbHz3vxnwLvRyNDXbwkZxjVyDodMJEhh"), 456000000, ""),
+            SendManyRecipient(keyIO.ZecToYec("tmYZAXYPCP56Xa5JQWWPZuK7o7bfUQW6kkd"), 789000000, ""),
         };
         std::shared_ptr<AsyncRPCOperation> operation( new AsyncRPCOperation_sendmany(std::nullopt, mtx, zaddr1, recipients, {}, 1) );
         std::shared_ptr<AsyncRPCOperation_sendmany> ptr = std::dynamic_pointer_cast<AsyncRPCOperation_sendmany> (operation);
@@ -1570,6 +1573,7 @@ BOOST_AUTO_TEST_CASE(rpc_wallet_encrypted_wallet_sapzkeys)
 BOOST_AUTO_TEST_CASE(rpc_z_listunspent_parameters)
 {
     SelectParams(CBaseChainParams::TESTNET);
+    KeyIO keyIO(Params());
 
     LOCK2(cs_main, pwalletMain->cs_wallet);
 
@@ -1597,10 +1601,11 @@ BOOST_AUTO_TEST_CASE(rpc_z_listunspent_parameters)
     BOOST_CHECK_THROW(CallRPC("z_listunspent 1 999 false [\"ztjiDe569DPNbyTE6TSdJTaSDhoXEHLGvYoUnBU1wfVNU52TEyT6berYtySkd21njAeEoh8fFJUT42kua9r8EnhBaEKqCpP\"]"), runtime_error);
 
     // allow watch only
-    BOOST_CHECK_NO_THROW(CallRPC("z_listunspent 1 999 true [\"ztjiDe569DPNbyTE6TSdJTaSDhoXEHLGvYoUnBU1wfVNU52TEyT6berYtySkd21njAeEoh8fFJUT42kua9r8EnhBaEKqCpP\"]"));
+    BOOST_CHECK_NO_THROW(CallRPC("z_listunspent 1 999 true [\"" + keyIO.ZecToYecShielded("ztjiDe569DPNbyTE6TSdJTaSDhoXEHLGvYoUnBU1wfVNU52TEyT6berYtySkd21njAeEoh8fFJUT42kua9r8EnhBaEKqCpP") + "\"]"));
 
     // wrong network, mainnet instead of testnet
-    BOOST_CHECK_THROW(CallRPC("z_listunspent 1 999 true [\"zcMuhvq8sEkHALuSU2i4NbNQxshSAYrpCExec45ZjtivYPbuiFPwk6WHy4SvsbeZ4siy1WheuRGjtaJmoD1J8bFqNXhsG6U\"]"), runtime_error);
+    KeyIO keyIOmain(Params(CBaseChainParams::MAIN));
+    BOOST_CHECK_THROW(CallRPC("z_listunspent 1 999 true [\"" + keyIOmain.ZecToYecShielded("zcMuhvq8sEkHALuSU2i4NbNQxshSAYrpCExec45ZjtivYPbuiFPwk6WHy4SvsbeZ4siy1WheuRGjtaJmoD1J8bFqNXhsG6U") + "\"]"), runtime_error);
 
     // create shielded address so we have the spending key
     BOOST_CHECK_NO_THROW(retValue = CallRPC("z_getnewaddress sprout"));
@@ -1619,6 +1624,7 @@ BOOST_AUTO_TEST_CASE(rpc_z_listunspent_parameters)
 BOOST_AUTO_TEST_CASE(rpc_z_shieldcoinbase_parameters)
 {
     SelectParams(CBaseChainParams::TESTNET);
+    KeyIO keyIO(Params());
 
     LOCK2(cs_main, pwalletMain->cs_wallet);
 
@@ -1636,13 +1642,13 @@ BOOST_AUTO_TEST_CASE(rpc_z_shieldcoinbase_parameters)
 
     // bad to address
     BOOST_CHECK_THROW(CallRPC("z_shieldcoinbase "
-    "tmRr6yJonqGK23UVhrKuyvTpF8qxQQjKigJ INVALIDtnpoQJVnYBZZqkFadj2bJJLThNCxbADGB5gSGeYTAGGrT5tejsxY9Zc1BtY8nnHmZkB"), runtime_error);
+            + keyIO.ZecToYecShielded("tmRr6yJonqGK23UVhrKuyvTpF8qxQQjKigJ") +  " INVALIDtnpoQJVnYBZZqkFadj2bJJLThNCxbADGB5gSGeYTAGGrT5tejsxY9Zc1BtY8nnHmZkB"), runtime_error);
 
     // invalid fee amount, cannot be negative
     BOOST_CHECK_THROW(CallRPC("z_shieldcoinbase "
-            "tmRr6yJonqGK23UVhrKuyvTpF8qxQQjKigJ "
-            "tnpoQJVnYBZZqkFadj2bJJLThNCxbADGB5gSGeYTAGGrT5tejsxY9Zc1BtY8nnHmZkB "
-            "-0.00001"
+            + keyIO.ZecToYecShielded("tmRr6yJonqGK23UVhrKuyvTpF8qxQQjKigJ")
+            +  " tnpoQJVnYBZZqkFadj2bJJLThNCxbADGB5gSGeYTAGGrT5tejsxY9Zc1BtY8nnHmZkB "
+            + "-0.00001"
             ), runtime_error);
 
     // invalid fee amount, bigger than MAX_MONEY

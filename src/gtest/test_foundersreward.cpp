@@ -116,6 +116,7 @@ int GetMaxFundingStreamHeight(const Consensus::Params& params) {
 
 TEST(FoundersRewardTest, General) {
     SelectParams(CBaseChainParams::TESTNET);
+    KeyIO keyIO(Params());
 
     CChainParams params = Params();
     
@@ -124,11 +125,11 @@ TEST(FoundersRewardTest, General) {
     // script.ToString() = OP_HASH160 55d64928e69829d9376c776550b6cc710d427153 OP_EQUAL
     // HexStr(script) = a91455d64928e69829d9376c776550b6cc710d42715387
     EXPECT_EQ(HexStr(params.GetFoundersRewardScriptAtHeight(1)), "a914ef775f1f997f122a062fff1a2d7443abd1f9c64287");
-    EXPECT_EQ(params.GetFoundersRewardAddressAtHeight(1), "t2UNzUUx8mWBCRYPRezvA363EYXyEpHokyi");
+    EXPECT_EQ(params.GetFoundersRewardAddressAtHeight(1), keyIO.ZecToYec("t2UNzUUx8mWBCRYPRezvA363EYXyEpHokyi"));
     EXPECT_EQ(HexStr(params.GetFoundersRewardScriptAtHeight(53126)), "a914ac67f4c072668138d88a86ff21b27207b283212f87");
-    EXPECT_EQ(params.GetFoundersRewardAddressAtHeight(53126), "t2NGQjYMQhFndDHguvUw4wZdNdsssA6K7x2");
+    EXPECT_EQ(params.GetFoundersRewardAddressAtHeight(53126), keyIO.ZecToYec("t2NGQjYMQhFndDHguvUw4wZdNdsssA6K7x2"));
     EXPECT_EQ(HexStr(params.GetFoundersRewardScriptAtHeight(53127)), "a91455d64928e69829d9376c776550b6cc710d42715387");
-    EXPECT_EQ(params.GetFoundersRewardAddressAtHeight(53127), "t2ENg7hHVqqs9JwU5cgjvSbxnT2a9USNfhy");
+    EXPECT_EQ(params.GetFoundersRewardAddressAtHeight(53127), keyIO.ZecToYec("t2ENg7hHVqqs9JwU5cgjvSbxnT2a9USNfhy"));
 
     // For YCash, the founders rewards should still work
     int ycashHeight = params.GetConsensus().vUpgrades[Consensus::UPGRADE_YCASH].nActivationHeight;
@@ -305,7 +306,7 @@ TEST(FundingStreamsRewardTest, Zip207Distribution) {
                 minHeight, 
                 minHeight + 12, 
                 {
-                    "t2UNzUUx8mWBCRYPRezvA363EYXyEpHokyi",
+                    keyIO.ZecToYec("t2UNzUUx8mWBCRYPRezvA363EYXyEpHokyi"),
                     shieldedAddr,
                 }
             )
@@ -343,7 +344,7 @@ TEST(FundingStreamsRewardTest, ParseFundingStream) {
             minHeight, 
             minHeight + 13, 
             {
-                "t2UNzUUx8mWBCRYPRezvA363EYXyEpHokyi",
+                keyIO.ZecToYec("t2UNzUUx8mWBCRYPRezvA363EYXyEpHokyi"),
                 shieldedAddr,
             }
         ),
