@@ -80,8 +80,23 @@ namespace Checkpoints {
 
     bool IsAncestorOfLastCheckpoint(const CCheckpointData& data, const CBlockIndex* pindex)
     {
-        CBlockIndex *pindexLastCheckpoint = GetLastCheckpoint(data);
-        return pindexLastCheckpoint && pindexLastCheckpoint->GetAncestor(pindex->nHeight) == pindex;
+        if (!fImporting) {
+            CBlockIndex *pindexLastCheckpoint = GetLastCheckpoint(data);
+            return pindexLastCheckpoint && pindexLastCheckpoint->GetAncestor(pindex->nHeight) == pindex;
+        }
+
+        // Workaround for block import:
+        // If daemon is importing blocks from file there is no forward fetching of headers and mapBlockIndex won't contain next "last checkpoint"
+        // GetLastCheckpoint() would return "previous last checkpoint" and our block can't be ancestor of it, only descendant
+        // This renders -ibdskiptxverification (-fastsync) unusable when importing blocks from bootstrap.dat and expensive checks enabled even at heights lower than last checkpoint
+        // Therefore, let's be permissive here and return true, at least until best block reaches last defined checkpoint height
+        if (!data.mapCheckpoints.empty()) {
+            int last_cp_height = std::prev(data.mapCheckpoints.end())->first;
+            if (pindex->nHeight <= last_cp_height)
+                return true;
+        }
+
+        return false;
     }
 
 
