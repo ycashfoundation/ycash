@@ -86,7 +86,7 @@ bool CDBEnv::Open(const fs::path& pathIn)
         nEnvFlags |= DB_PRIVATE;
 
     dbenv->set_lg_dir(pathLogDir.string().c_str());
-    dbenv->set_cachesize(0, 0x100000, 1); // 1 MiB should be enough for just the wallet
+    dbenv->set_cachesize(0, 128 * 1024 * 1024, 1); // 128 MiB (previous default 1 MiB)
     dbenv->set_lg_bsize(0x10000);
     dbenv->set_lg_max(1048576);
     dbenv->set_lk_max_locks(40000);
