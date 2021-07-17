@@ -18,6 +18,11 @@
 
 #include <univalue.h>
 
+#ifdef YCASH_WR
+extern bool fBuildingWitnessCache;
+extern bool fInitWitnessesBuilt;
+#endif
+
 class AsyncRPCQueue;
 class CRPCCommand;
 

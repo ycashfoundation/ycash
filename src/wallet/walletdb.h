@@ -30,6 +30,9 @@ class CWallet;
 class CWalletTx;
 class uint160;
 class uint256;
+#ifdef YCASH_WR
+class JSOutPoint;
+#endif // YCASH_WR
 
 /** Error statuses for the wallet database */
 enum DBErrors
@@ -132,6 +135,17 @@ public:
     bool WritePurpose(const std::string& strAddress, const std::string& purpose);
     bool ErasePurpose(const std::string& strAddress);
 
+#ifdef YCASH_WR
+    //Begin Historical Wallet Tx
+    bool WriteArcTx(uint256 hash, ArchiveTxPoint arcTxPoint);
+    bool EraseArcTx(uint256 hash);
+    bool WriteArcSproutOp(uint256 nullifier, JSOutPoint op);
+    bool EraseArcSproutOp(uint256 nullifier);
+    bool WriteArcSaplingOp(uint256 nullifier, SaplingOutPoint op);
+    bool EraseArcSaplingOp(uint256 nullifier);
+    //End Historical Wallet Tx
+#endif // YCASH_WR
+
     bool WriteTx(uint256 hash, const CWalletTx& wtx);
     bool EraseTx(uint256 hash);
 
@@ -173,7 +187,12 @@ public:
 
     DBErrors ReorderTransactions(CWallet* pwallet);
     DBErrors LoadWallet(CWallet* pwallet);
+#ifdef YCASH_WR
+    static bool Compact(CDBEnv& dbenv, const std::string& strFile);
+    DBErrors FindWalletTxToZap(CWallet* pwallet, std::vector<uint256>& vTxHash, std::vector<CWalletTx>& vWtx, std::vector<uint256>& vArcHash, std::vector<uint256>& vArcSproutNullifier, std::vector<uint256>& vArcSaplingNullifier);
+#else
     DBErrors FindWalletTxToZap(CWallet* pwallet, std::vector<uint256>& vTxHash, std::vector<CWalletTx>& vWtx);
+#endif // YCASH_WR
     DBErrors ZapWalletTx(CWallet* pwallet, std::vector<CWalletTx>& vWtx);
     static bool Recover(CDBEnv& dbenv, const std::string& filename, bool fOnlyKeys);
     static bool Recover(CDBEnv& dbenv, const std::string& filename);

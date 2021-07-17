@@ -49,6 +49,13 @@ extern unsigned int nTxConfirmTarget;
 extern bool bSpendZeroConfChange;
 extern bool fSendFreeTransactions;
 extern bool fPayAtLeastCustomFee;
+#ifdef YCASH_WR
+extern bool fTxDeleteEnabled;
+extern bool fTxConflictDeleteEnabled;
+extern int fDeleteInterval;
+extern unsigned int fDeleteTransactionsAfterNBlocks;
+extern unsigned int fKeepLastNTransactions;
+#endif // YCASH_WR
 
 static const unsigned int DEFAULT_KEYPOOL_SIZE = 100;
 //! -paytxfee default
@@ -73,6 +80,20 @@ static const unsigned int WITNESS_CACHE_SIZE = MAX_REORG_LENGTH + 1;
 
 //! Size of HD seed in bytes
 static const size_t HD_WALLET_SEED_LENGTH = 32;
+
+#ifdef YCASH_WR
+//Default Transaction Rentention N-BLOCKS
+static const int DEFAULT_TX_DELETE_INTERVAL = 1000;
+
+//Default Transaction Rentention N-BLOCKS
+static const unsigned int DEFAULT_TX_RETENTION_BLOCKS = 10000;
+
+//Default Retenion Last N-Transactions
+static const unsigned int DEFAULT_TX_RETENTION_LASTTX = 200;
+
+//Amount of transactions to delete per run while syncing
+static const int MAX_DELETE_TX_SIZE = 50000;
+#endif // YCASH_WR
 
 extern const char * DEFAULT_WALLET_DAT;
 
@@ -248,11 +269,22 @@ public:
      */
     int witnessHeight;
 
+#ifdef YCASH_WR
+    //In Memory Only
+    bool witnessRootValidated;
+
+    SproutNoteData() : address(), nullifier(), witnessHeight {-1}, witnessRootValidated {false} { }
+    SproutNoteData(libzcash::SproutPaymentAddress a) :
+            address {a}, nullifier(), witnessHeight {-1}, witnessRootValidated {false} { }
+    SproutNoteData(libzcash::SproutPaymentAddress a, uint256 n) :
+            address {a}, nullifier {n}, witnessHeight {-1}, witnessRootValidated {false} { }
+#else
     SproutNoteData() : address(), nullifier(), witnessHeight {-1} { }
     SproutNoteData(libzcash::SproutPaymentAddress a) :
             address {a}, nullifier(), witnessHeight {-1} { }
     SproutNoteData(libzcash::SproutPaymentAddress a, uint256 n) :
             address {a}, nullifier {n}, witnessHeight {-1} { }
+#endif // YCASH_WR
 
     ADD_SERIALIZE_METHODS;
 
@@ -285,14 +317,25 @@ public:
      * We initialize the height to -1 for the same reason as we do in SproutNoteData.
      * See the comment in that class for a full description.
      */
+#ifdef YCASH_WR
+    SaplingNoteData() : witnessHeight {-1}, nullifier(), witnessRootValidated {false} { }
+    SaplingNoteData(libzcash::SaplingIncomingViewingKey ivk) : ivk {ivk}, witnessHeight {-1}, nullifier(), witnessRootValidated {false} { }
+    SaplingNoteData(libzcash::SaplingIncomingViewingKey ivk, uint256 n) : ivk {ivk}, witnessHeight {-1}, nullifier(n), witnessRootValidated {false} { }
+#else
     SaplingNoteData() : witnessHeight {-1}, nullifier() { }
     SaplingNoteData(libzcash::SaplingIncomingViewingKey ivk) : ivk {ivk}, witnessHeight {-1}, nullifier() { }
     SaplingNoteData(libzcash::SaplingIncomingViewingKey ivk, uint256 n) : ivk {ivk}, witnessHeight {-1}, nullifier(n) { }
+#endif // YCASH_WR
 
     std::list<SaplingWitness> witnesses;
     int witnessHeight;
     libzcash::SaplingIncomingViewingKey ivk;
     std::optional<uint256> nullifier;
+
+#ifdef YCASH_WR
+    //In Memory Only
+    bool witnessRootValidated;
+#endif // YCASH_WR
 
     ADD_SERIALIZE_METHODS;
 
@@ -603,6 +646,10 @@ public:
     bool IsTrusted() const;
 
     bool WriteToDisk(CWalletDB *pwalletdb);
+#ifdef YCASH_WR    
+    bool WriteArcSproutOpToDisk(CWalletDB *pwalletdb, uint256 nullifier, JSOutPoint op);
+    bool WriteArcSaplingOpToDisk(CWalletDB *pwalletdb, uint256 nullifier, SaplingOutPoint op);
+#endif // YCASH_WR
 
     int64_t GetTxTime() const;
     int GetRequestCount() const;
@@ -792,6 +839,11 @@ private:
     std::vector<CTransaction> pendingSaplingMigrationTxs;
     AsyncRPCOperationId saplingMigrationOperationId;
 
+#ifdef YCASH_WR
+    std::vector<CTransaction> pendingSaplingConsolidationTxs;
+    AsyncRPCOperationId saplingConsolidationOperationId;
+#endif // YCASH_WR
+
     void AddToTransparentSpends(const COutPoint& outpoint, const uint256& wtxid);
     void AddToSproutSpends(const uint256& nullifier, const uint256& wtxid);
     void AddToSaplingSpends(const uint256& nullifier, const uint256& wtxid);
@@ -805,10 +857,34 @@ public:
      */
     int64_t nWitnessCacheSize;
     bool fSaplingMigrationEnabled = false;
+#ifdef YCASH_WR
+    bool fSaplingConsolidationEnabled = false;
+#endif // YCASH_WR
 
     void ClearNoteWitnessCache();
 
+#ifdef YCASH_WR
+    int64_t NullifierCount();
+    std::set<uint256> GetNullifiers();
+
+    std::map<uint256, ArchiveTxPoint> mapArcTxs;
+    void AddToArcTxs(const uint256& wtxid, const ArchiveTxPoint& ArcTxPt);
+
+    std::map<uint256, JSOutPoint> mapArcJSOutPoints;
+    void AddToArcJSOutPoints(const uint256& nullifier, const JSOutPoint& op);
+
+    std::map<uint256, SaplingOutPoint> mapArcSaplingOutPoints;
+    void AddToArcSaplingOutPoints(const uint256& nullifier, const SaplingOutPoint& op);
+#endif // YCASH_WR
+
 protected:
+#ifdef YCASH_WR
+    int SproutWitnessMinimumHeight(const uint256& nullifier, int nWitnessHeight, int nMinimumHeight);
+    int SaplingWitnessMinimumHeight(const uint256& nullifier, int nWitnessHeight, int nMinimumHeight);
+    int VerifyAndSetInitialWitness(const CBlockIndex* pindex, bool witnessOnly);
+    void BuildWitnessCache(const CBlockIndex* pindex, bool witnessOnly); 
+    void DecrementNoteWitnessesWR(const CBlockIndex* pindex);
+#endif // YCASH_WR
     /**
      * pindex is the new tip being connected.
      */
@@ -1038,6 +1114,12 @@ public:
     bool IsSpent(const uint256& hash, unsigned int n) const;
     bool IsSproutSpent(const uint256& nullifier) const;
     bool IsSaplingSpent(const uint256& nullifier) const;
+#ifdef YCASH_WR
+    unsigned int GetSpendDepth(const uint256& hash, unsigned int n) const;
+    unsigned int GetSproutSpendDepth(const uint256& nullifier) const;
+    unsigned int GetSaplingSpendDepth(const uint256& nullifier) const;
+#endif // YCASH_WR
+
 
     bool IsLockedCoin(uint256 hash, unsigned int n) const;
     void LockCoin(COutPoint& output);
@@ -1178,8 +1260,15 @@ public:
     void MarkDirty();
     bool UpdateNullifierNoteMap();
     void UpdateNullifierNoteMapWithTx(const CWalletTx& wtx);
+#ifdef YCASH_WR
+    void UpdateSproutNullifierNoteMapWithTx(CWalletTx& wtx);
+#endif // YCASH_WR
     void UpdateSaplingNullifierNoteMapWithTx(CWalletTx& wtx);
+#ifdef YCASH_WR
+    void UpdateNullifierNoteMapForBlock(const CBlock* pblock);
+#else
     void UpdateSaplingNullifierNoteMapForBlock(const CBlock* pblock);
+#endif // YCASH_WR    
     bool AddToWallet(const CWalletTx& wtxIn, bool fFromLoadWallet, CWalletDB* pwalletdb);
     void SyncTransaction(const CTransaction& tx, const CBlock* pblock, const int nHeight);
     bool AddToWalletIfInvolvingMe(const CTransaction& tx, const CBlock* pblock, const int nHeight, bool fUpdate);
@@ -1188,6 +1277,13 @@ public:
          std::vector<uint256> commitments,
          std::vector<std::optional<SproutWitness>>& witnesses,
          uint256 &final_anchor);
+#ifdef YCASH_WR
+    void ReorderWalletTransactions(std::map<std::pair<int,int>, CWalletTx*> &mapSorted, int64_t &maxOrderPos);
+    void UpdateWalletTransactionOrder(std::map<std::pair<int,int>, CWalletTx*> &mapSorted, bool resetOrder);
+    void DeleteTransactions(std::vector<uint256> &removeTxs);
+    void DeleteWalletTransactions(const CBlockIndex* pindex);
+    bool initalizeArcTx();
+#endif // YCASH_WR
     int ScanForWalletTransactions(CBlockIndex* pindexStart, bool fUpdate = false);
     void ReacceptWalletTransactions();
     void ResendWalletTransactions(int64_t nBestBlockTime);
@@ -1277,6 +1373,10 @@ public:
         std::optional<std::pair<SproutMerkleTree, SaplingMerkleTree>> added);
     void RunSaplingMigration(int blockHeight);
     void AddPendingSaplingMigrationTx(const CTransaction& tx);
+#ifdef YCASH_WR
+    void RunSaplingConsolidation(int blockHeight);
+    void CommitConsolidationTx(const CTransaction& tx);
+#endif // YCASH_WR
     /** Saves witness caches and best block locator to disk. */
     void SetBestChain(const CBlockLocator& loc);
     std::set<std::pair<libzcash::PaymentAddress, uint256>> GetNullifiersForAddresses(const std::set<libzcash::PaymentAddress> & addresses);

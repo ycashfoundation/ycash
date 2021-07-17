@@ -55,6 +55,13 @@ public:
                                 SaplingMerkleTree& saplingTree) {
         CWallet::IncrementNoteWitnesses(pindex, pblock, sproutTree, saplingTree);
     }
+#ifndef YCASH_WR
+
+#else
+    void BuildWitnessCache(const CBlockIndex* pindex, bool witnessOnly) {
+        CWallet::BuildWitnessCache(pindex, witnessOnly);
+    }
+#endif // YCASH_WR
     void DecrementNoteWitnesses(const CBlockIndex* pindex) {
         CWallet::DecrementNoteWitnesses(pindex);
     }
@@ -99,7 +106,6 @@ std::pair<JSOutPoint, SaplingOutPoint> CreateValidBlock(TestWallet& wallet,
 
     block.vtx.push_back(wtx);
     wallet.IncrementNoteWitnesses(&index, &block, sproutTree, saplingTree);
-
     return std::make_pair(jsoutpt, saplingNotes[0]);
 }
 
@@ -774,7 +780,7 @@ TEST(WalletTests, GetConflictedSaplingNotes) {
 
         // Simulate receiving new block and ChainTip signal
         wallet.IncrementNoteWitnesses(&fakeIndex, &block, sproutTree, saplingTree);
-        wallet.UpdateSaplingNullifierNoteMapForBlock(&block);
+        wallet.UpdateNullifierNoteMapForBlock(&block);
 
         // Retrieve the updated wtx from wallet
         uint256 hash = wtx.GetHash();
@@ -1032,7 +1038,7 @@ TEST(WalletTests, NavigateFromSaplingNullifierToNote) {
 
     // Simulate receiving new block and ChainTip signal
     wallet.IncrementNoteWitnesses(&fakeIndex, &block, sproutTree, testNote.tree);
-    wallet.UpdateSaplingNullifierNoteMapForBlock(&block);
+    wallet.UpdateNullifierNoteMapForBlock(&block);
 
     // Retrieve the updated wtx from wallet
     uint256 hash = wtx.GetHash();
@@ -1150,8 +1156,9 @@ TEST(WalletTests, SpentSaplingNoteIsFromMe) {
         // Simulate receiving new block and ChainTip signal.
         // This triggers calculation of nullifiers for notes belonging to this wallet
         // in the output descriptions of wtx.
+
         wallet.IncrementNoteWitnesses(&fakeIndex, &block, sproutTree, saplingTree);
-        wallet.UpdateSaplingNullifierNoteMapForBlock(&block);
+        wallet.UpdateNullifierNoteMapForBlock(&block);
 
         // Retrieve the updated wtx from wallet
         wtx = wallet.mapWallet[wtx.GetHash()];
@@ -1296,7 +1303,7 @@ TEST(WalletTests, CachedWitnessesEmptyChain) {
 
     // Until #1302 is implemented, this should triggger an assertion
     EXPECT_DEATH(wallet.DecrementNoteWitnesses(&index),
-                 ".*nWitnessCacheSize > 0.*");
+                 ".*nWitnessCacheSize > 0.*") << __FILE__ << __LINE__;
 }
 
 TEST(WalletTests, CachedWitnessesChainTip) {
@@ -1379,6 +1386,7 @@ TEST(WalletTests, CachedWitnessesChainTip) {
 
         // Re-incrementing with the same block should give the same result
         wallet.IncrementNoteWitnesses(&index2, &block2, sproutTree, saplingTree);
+
         auto anchors4 = GetWitnessesAndAnchors(wallet, sproutNotes, saplingNotes, sproutWitnesses, saplingWitnesses);
         EXPECT_NE(anchors4.first, anchors4.second);
 
@@ -1389,6 +1397,7 @@ TEST(WalletTests, CachedWitnessesChainTip) {
 
         // Incrementing with the same block again should not change the cache
         wallet.IncrementNoteWitnesses(&index2, &block2, sproutTree, saplingTree);
+
         std::vector<std::optional<SproutWitness>> sproutWitnesses5;
         std::vector<std::optional<SaplingWitness>> saplingWitnesses5;
 
@@ -1558,6 +1567,7 @@ TEST(WalletTests, CachedWitnessesCleanIndex) {
 
             {
                 wallet.IncrementNoteWitnesses(&(indices[i]), &(blocks[i]), sproutRiPrevTree, saplingRiPrevTree);
+
                 auto anchors = GetWitnessesAndAnchors(wallet, sproutNotes, saplingNotes, sproutWitnesses, saplingWitnesses);
                 for (size_t j = 0; j < numBlocks; j++) {
                     EXPECT_TRUE((bool) sproutWitnesses[j]);
@@ -1946,7 +1956,7 @@ TEST(WalletTests, UpdatedSaplingNoteData) {
 
     // Simulate receiving new block and ChainTip signal
     wallet.IncrementNoteWitnesses(&fakeIndex, &block, sproutTree, testNote.tree);
-    wallet.UpdateSaplingNullifierNoteMapForBlock(&block);
+    wallet.UpdateNullifierNoteMapForBlock(&block);
 
     // Retrieve the updated wtx from wallet
     uint256 hash = wtx.GetHash();
@@ -2093,7 +2103,7 @@ TEST(WalletTests, MarkAffectedSaplingTransactionsDirty) {
 
     // Simulate receiving new block and ChainTip signal
     wallet.IncrementNoteWitnesses(&fakeIndex, &block, sproutTree, saplingTree);
-    wallet.UpdateSaplingNullifierNoteMapForBlock(&block);
+    wallet.UpdateNullifierNoteMapForBlock(&block);
 
     // Retrieve the updated wtx from wallet
     uint256 hash = wtx.GetHash();

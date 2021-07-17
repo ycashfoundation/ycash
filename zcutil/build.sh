@@ -77,6 +77,14 @@ case "$CONFIGURE_FLAGS" in
     DEBUG=
 ;;esac
 
+# Enable witness rework version build:
+#   YCASH_WR=1
+YCASH_WR_CPPFLAGS=
+if [ "${YCASH_WR-0}" = "1" ]
+then
+    YCASH_WR_CPPFLAGS="CPPFLAGS=-DYCASH_WR"
+fi
+
 HOST="$HOST" BUILD="$BUILD" "$MAKE" "$@" -C ./depends/ DEBUG="$DEBUG"
 
 if [ "${BUILD_STAGE:-all}" = "depends" ]
@@ -85,5 +93,5 @@ then
 fi
 
 ./autogen.sh
-CONFIG_SITE="$PWD/depends/$HOST/share/config.site" ./configure $CONFIGURE_FLAGS
+CONFIG_SITE="$PWD/depends/$HOST/share/config.site" ./configure $CONFIGURE_FLAGS $YCASH_WR_CPPFLAGS
 "$MAKE" "$@"

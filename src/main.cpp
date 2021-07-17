@@ -71,7 +71,11 @@ CConditionVariable cvBlockChange;
 int nScriptCheckThreads = 0;
 std::atomic_bool fImporting(false);
 std::atomic_bool fReindex(false);
+#ifdef YCASH_WR
+bool fTxIndex = true;
+#else
 bool fTxIndex = false;
+#endif // YCASH_WR
 bool fAddressIndex = false;     // insightexplorer || lightwalletd
 bool fSpentIndex = false;       // insightexplorer
 bool fTimestampIndex = false;   // insightexplorer
@@ -5234,8 +5238,13 @@ bool InitBlockIndex(const CChainParams& chainparams)
     if (chainActive.Genesis() != NULL)
         return true;
 
+#ifdef YCASH_WR
+    // Use the hard-coded setting for -txindex in the new database
+    fTxIndex = true;
+#else
     // Use the provided setting for -txindex in the new database
     fTxIndex = GetBoolArg("-txindex", DEFAULT_TXINDEX);
+#endif // YCASH_WR
     pblocktree->WriteFlag("txindex", fTxIndex);
 
     // Use the provided setting for -insightexplorer or -lightwalletd in the new database

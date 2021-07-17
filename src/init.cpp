@@ -473,8 +473,13 @@ std::string HelpMessage(HelpMessageMode mode)
                 "-fundingstream=streamId:startHeight:endHeight:comma_delimited_addresses",
                 "Use given addresses for block subsidy share paid to the funding stream with id <streamId> (regtest-only)");
     }
+#ifdef YCASH_WR
+    std::string debugCategories = "addrman, alert, bench, coindb, db, deletetx, estimatefee, http, libevent, lock, mempool, net, partitioncheck, pow, proxy, prune, "
+                             "rand, receiveunsafe, reindex, rpc, selectcoins, tor, zmq, zrpc, zrpcunsafe (implies zrpc)"; // Don't translate these
+#else
     std::string debugCategories = "addrman, alert, bench, coindb, db, estimatefee, http, libevent, lock, mempool, net, partitioncheck, pow, proxy, prune, "
                              "rand, receiveunsafe, reindex, rpc, selectcoins, tor, zmq, zrpc, zrpcunsafe (implies zrpc)"; // Don't translate these
+#endif // YCASH_WR
     strUsage += HelpMessageOpt("-debug=<category>", strprintf(_("Output debugging information (default: %u, supplying <category> is optional)"), 0) + ". " +
         _("If <category> is not supplied or if <category> = 1, output all debugging information.") + " " + _("<category> can be:") + " " + debugCategories + ". " +
         _("For multiple specific categories use -debug=<category> multiple times."));
@@ -1528,7 +1533,7 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
 
     // https://github.com/bitpay/bitcoin/commit/c91d78b578a8700a45be936cb5bb0931df8f4b87#diff-c865a8939105e6350a50af02766291b7R1233
     if (GetBoolArg("-insightexplorer", false)) {
-        if (!GetBoolArg("-txindex", false)) {
+        if (!GetBoolArg("-txindex", DEFAULT_TXINDEX)) {
             return InitError(_("-insightexplorer requires -txindex."));
         }
         // increase cache if additional indices are needed
