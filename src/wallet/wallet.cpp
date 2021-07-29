@@ -5838,6 +5838,7 @@ bool CWallet::GetDestData(const CTxDestination &dest, const std::string &key, st
 std::string CWallet::GetWalletHelpString(bool showDebug)
 {
     std::string strUsage = HelpMessageGroup(_("Wallet options:"));
+    strUsage += HelpMessageOpt("-bdbcache", strprintf(_("Set BerkeleyDB cache size (in megabytes). Allowed range is from 1 to 1024 (default: %u)"), DEFAULT_BDB_CACHE_SIZE));
     strUsage += HelpMessageOpt("-disablewallet", _("Do not load the wallet and disable wallet RPC calls"));
     strUsage += HelpMessageOpt("-keypool=<n>", strprintf(_("Set key pool size to <n> (default: %u)"), DEFAULT_KEYPOOL_SIZE));
 #ifdef YCASH_WR

@@ -23,6 +23,7 @@
 
 static const unsigned int DEFAULT_WALLET_DBLOGSIZE = 100;
 static const bool DEFAULT_WALLET_PRIVDB = true;
+static const unsigned int DEFAULT_BDB_CACHE_SIZE = 16;
 
 class CDBEnv
 {

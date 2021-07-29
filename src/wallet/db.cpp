@@ -86,7 +86,24 @@ bool CDBEnv::Open(const fs::path& pathIn)
         nEnvFlags |= DB_PRIVATE;
 
     dbenv->set_lg_dir(pathLogDir.string().c_str());
-    dbenv->set_cachesize(0, 128 * 1024 * 1024, 1); // 128 MiB (previous default 1 MiB)
+    /****************************************************************************************************
+     * Any cache size less than 500MB is automatically increased by 25% to account for cache overhead,  *
+     * cache sizes larger than 500MB are used as specified.                                             *
+     ****************************************************************************************************/
+    u_int32_t bdb_cache_size = GetArg("-bdbcache", DEFAULT_BDB_CACHE_SIZE);
+    if (bdb_cache_size < 1 || bdb_cache_size > 1024)
+    {
+        LogPrintf("-bdbcache %i out of allowed range (1...1024) MB, using default %i MB\n", bdb_cache_size, DEFAULT_BDB_CACHE_SIZE);
+        bdb_cache_size = DEFAULT_BDB_CACHE_SIZE;
+    }
+    u_int32_t gbytes = bdb_cache_size / 1024;
+    u_int32_t bytes = (bdb_cache_size - (gbytes * 1024)) * 0x100000;
+    int ncache = 1;
+    // set cache size
+    dbenv->set_cachesize(gbytes, bytes, ncache);
+    // report actual cache size
+    dbenv->get_cachesize(&gbytes, &bytes, &ncache);
+    LogPrintf("BerkeleyDB cache = %i MB\n", gbytes * 1024 + bytes / 0x100000);
     dbenv->set_lg_bsize(0x10000);
     dbenv->set_lg_max(1048576);
     dbenv->set_lk_max_locks(40000);
