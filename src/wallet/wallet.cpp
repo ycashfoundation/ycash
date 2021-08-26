@@ -3587,7 +3587,6 @@ void CWallet::DeleteWalletTransactions(const CBlockIndex* pindex)
         }
 
         int nDeleteAfter = (int)fDeleteTransactionsAfterNBlocks;
-        bool runCompact = false;
 
         //Check for acentries - exit function if found
         {
@@ -3815,18 +3814,21 @@ void CWallet::DeleteWalletTransactions(const CBlockIndex* pindex)
             if (deleteTx && int(removeTxs.size()) < MAX_DELETE_TX_SIZE)
             {
                 removeTxs.push_back(wtxid);
-                runCompact = true;
             }
         }
 
-        //Delete Transactions from wallet
-        DeleteTransactions(removeTxs);
-        LogPrintf("Delete Tx - Total Transaction Count %i, Transactions Deleted %i\n ", txCount, int(removeTxs.size()));
+        int nWtxesToRemove = removeTxs.size();
 
-        //Compress Wallet
-        if (runCompact)
+        // Delete Transactions from wallet
+        DeleteTransactions(removeTxs);
+        LogPrintf("Delete Tx - Total Transaction Count %i, Transactions Deleted %i\n ", txCount, nWtxesToRemove);
+
+        // Compact wallet only if cumulative count of deleted wtxes has reached the threshold
+        nDeletedTxes += nWtxesToRemove;
+        if (nDeletedTxes >= COMPACTING_THRESHOLD)
         {
-            CWalletDB::Compact(bitdb,strWalletFile);
+            CWalletDB::Compact(bitdb, strWalletFile);
+            nDeletedTxes = 0;
         }
     }
 }

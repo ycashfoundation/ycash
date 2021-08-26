@@ -819,6 +819,9 @@ private:
     int64_t nLastResend;
     int64_t nLastSetChain;
     int nSetChainUpdates;
+#ifdef YCASH_WR
+    int nDeletedTxes;
+#endif // YCASH_WR
     bool fBroadcastTransactions;
 
     template <class T>
