@@ -780,7 +780,11 @@ TEST(WalletTests, GetConflictedSaplingNotes) {
 
         // Simulate receiving new block and ChainTip signal
         wallet.IncrementNoteWitnesses(&fakeIndex, &block, sproutTree, saplingTree);
+#ifdef YCASH_WR
         wallet.UpdateNullifierNoteMapForBlock(&block);
+#else
+        wallet.UpdateSaplingNullifierNoteMapForBlock(&block);
+#endif // YCASH_WR
 
         // Retrieve the updated wtx from wallet
         uint256 hash = wtx.GetHash();
@@ -1038,7 +1042,11 @@ TEST(WalletTests, NavigateFromSaplingNullifierToNote) {
 
     // Simulate receiving new block and ChainTip signal
     wallet.IncrementNoteWitnesses(&fakeIndex, &block, sproutTree, testNote.tree);
+#ifdef YCASH_WR
     wallet.UpdateNullifierNoteMapForBlock(&block);
+#else
+    wallet.UpdateSaplingNullifierNoteMapForBlock(&block);
+#endif // YCASH_WR
 
     // Retrieve the updated wtx from wallet
     uint256 hash = wtx.GetHash();
@@ -1158,7 +1166,11 @@ TEST(WalletTests, SpentSaplingNoteIsFromMe) {
         // in the output descriptions of wtx.
 
         wallet.IncrementNoteWitnesses(&fakeIndex, &block, sproutTree, saplingTree);
+#ifdef YCASH_WR
         wallet.UpdateNullifierNoteMapForBlock(&block);
+#else
+        wallet.UpdateSaplingNullifierNoteMapForBlock(&block);
+#endif // YCASH_WR
 
         // Retrieve the updated wtx from wallet
         wtx = wallet.mapWallet[wtx.GetHash()];
@@ -1956,7 +1968,11 @@ TEST(WalletTests, UpdatedSaplingNoteData) {
 
     // Simulate receiving new block and ChainTip signal
     wallet.IncrementNoteWitnesses(&fakeIndex, &block, sproutTree, testNote.tree);
+#ifdef YCASH_WR
     wallet.UpdateNullifierNoteMapForBlock(&block);
+#else
+    wallet.UpdateSaplingNullifierNoteMapForBlock(&block);
+#endif // YCASH_WR
 
     // Retrieve the updated wtx from wallet
     uint256 hash = wtx.GetHash();
@@ -2103,7 +2119,11 @@ TEST(WalletTests, MarkAffectedSaplingTransactionsDirty) {
 
     // Simulate receiving new block and ChainTip signal
     wallet.IncrementNoteWitnesses(&fakeIndex, &block, sproutTree, saplingTree);
+#ifdef YCASH_WR
     wallet.UpdateNullifierNoteMapForBlock(&block);
+#else
+    wallet.UpdateSaplingNullifierNoteMapForBlock(&block);
+#endif // YCASH_WR
 
     // Retrieve the updated wtx from wallet
     uint256 hash = wtx.GetHash();
