@@ -2,13 +2,13 @@
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or https://www.opensource.org/licenses/mit-license.php .
 
-TESTS += zcash-gtest
-noinst_PROGRAMS += zcash-gtest
+TESTS += ycash-gtest
+noinst_PROGRAMS += ycash-gtest
 
 # tool for generating our public parameters.
 # test_checktransaction.cpp MUST be before
 # any test that calls SelectParams().
-zcash_gtest_SOURCES = \
+ycash_gtest_SOURCES = \
 	gtest/main.cpp \
 	gtest/utils.cpp \
 	gtest/utils.h \
@@ -20,10 +20,10 @@ zcash_gtest_SOURCES = \
 # These tests are order-dependent, because they
 # depend on global state (see #1539)
 if ENABLE_WALLET
-zcash_gtest_SOURCES += \
+ycash_gtest_SOURCES += \
 	wallet/gtest/test_wallet_zkeys.cpp
 endif
-zcash_gtest_SOURCES += \
+ycash_gtest_SOURCES += \
 	gtest/test_tautology.cpp \
 	gtest/test_allocator.cpp \
 	gtest/test_checkblock.cpp \
@@ -56,15 +56,15 @@ zcash_gtest_SOURCES += \
 	gtest/test_validation.cpp \
 	gtest/test_zip32.cpp
 if ENABLE_WALLET
-zcash_gtest_SOURCES += \
+ycash_gtest_SOURCES += \
 	wallet/gtest/test_paymentdisclosure.cpp \
 	wallet/gtest/test_wallet.cpp
 endif
 
-zcash_gtest_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES)
-zcash_gtest_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
+ycash_gtest_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES)
+ycash_gtest_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
 
-zcash_gtest_LDADD = \
+ycash_gtest_LDADD = \
   -lgtest -lgmock \
   $(LIBBITCOIN_SERVER) \
   $(LIBBITCOIN_CLI) \
@@ -80,7 +80,7 @@ zcash_gtest_LDADD = \
   $(LIBMEMENV) \
   $(LIBSECP256K1)
 
-zcash_gtest_LDADD += \
+ycash_gtest_LDADD += \
   $(LIBZCASH_SCRIPT) \
   $(BOOST_LIBS) \
   $(BOOST_UNIT_TEST_FRAMEWORK_LIB) \
@@ -92,10 +92,10 @@ zcash_gtest_LDADD += \
   $(LIBRUSTZCASH) \
   $(LIBZCASH_LIBS)
 
-zcash_gtest_LDFLAGS = $(RELDFLAGS) $(AM_LDFLAGS) $(LIBTOOL_APP_LDFLAGS) -static
+ycash_gtest_LDFLAGS = $(RELDFLAGS) $(AM_LDFLAGS) $(LIBTOOL_APP_LDFLAGS) -static
 
-zcash-gtest_check: zcash-gtest FORCE
-	./zcash-gtest
+ycash-gtest_check: ycash-gtest FORCE
+	./ycash-gtest
 
-zcash-gtest-expected-failures: zcash-gtest FORCE
-	./zcash-gtest --gtest_filter=*DISABLED_* --gtest_also_run_disabled_tests
+ycash-gtest-expected-failures: ycash-gtest FORCE
+	./ycash-gtest --gtest_filter=*DISABLED_* --gtest_also_run_disabled_tests

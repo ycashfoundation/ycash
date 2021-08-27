@@ -4,7 +4,7 @@
 src/bitcoin
 src/ycashd
 src/ycash-cli
-src/zcash-gtest
+src/ycash-gtest
 src/ycash-tx
 src/test/test_bitcoin
 zcutil/bin/
@@ -96,7 +96,7 @@ build
 *.gcda
 /*.info
 test_bitcoin.coverage/
-zcash-gtest.coverage/
+ycash-gtest.coverage/
 total.coverage/
 coverage_percent.txt
 afl-temp

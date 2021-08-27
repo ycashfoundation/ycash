@@ -1206,7 +1206,7 @@ TEST(WalletTests, SpentSaplingNoteIsFromMe) {
         auto nullifier2 = maybe_nf.value();
 
         // NOTE: Not updating the anchor results in a core dump.  Shouldn't builder just return error?
-        // *** Error in `./zcash-gtest': double free or corruption (out): 0x00007ffd8755d990 ***
+        // *** Error in `./ycash-gtest': double free or corruption (out): 0x00007ffd8755d990 ***
         anchor = saplingTree.root();
 
         // Create transaction to spend note B

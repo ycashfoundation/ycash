@@ -355,7 +355,7 @@ case "$1" in
         case "$2" in
             gtest)
                 rm -f valgrind.out
-                valgrind --leak-check=yes -v --error-limit=no --log-file="valgrind.out" ./src/zcash-gtest
+                valgrind --leak-check=yes -v --error-limit=no --log-file="valgrind.out" ./src/ycash-gtest
                 cat valgrind.out
                 rm -f valgrind.out
                 ;;
