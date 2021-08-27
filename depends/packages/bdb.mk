@@ -6,8 +6,10 @@ $(package)_sha256_hash=a9c5e2b004a5777aa03510cfe5cd766a4a3b777713406b02809c17c8e
 $(package)_build_subdir=build_unix
 $(package)_patches=winioctl-and-atomic_init_db.patch
 
-ifneq ($(host_os),darwin)
-$(package)_dependencies=libcxx
+ifneq ($(YCASH_TOOLCHAIN), GCC)
+  ifneq ($(host_os),darwin)
+    $(package)_dependencies=libcxx
+  endif
 endif
 
 define $(package)_set_vars
@@ -16,17 +18,19 @@ $(package)_config_opts_mingw32=--enable-mingw
 $(package)_config_opts_linux=--with-pic
 $(package)_config_opts_freebsd=--with-pic
 ifneq ($(build_os),darwin)
-$(package)_config_opts_darwin=--disable-atomicsupport
+  $(package)_config_opts_darwin=--disable-atomicsupport
 endif
 $(package)_config_opts_aarch64=--disable-atomicsupport
 $(package)_cxxflags+=-std=c++17
 
 $(package)_cflags_mingw32+=-fno-builtin-stpcpy
 
-ifeq ($(host_os),freebsd)
-  $(package)_ldflags+=-static-libstdc++ -lcxxrt
-else
-  $(package)_ldflags+=-static-libstdc++ -lc++abi
+ifneq ($(YCASH_TOOLCHAIN), GCC)
+  ifeq ($(host_os),freebsd)
+    $(package)_ldflags+=-static-libstdc++ -lcxxrt
+  else
+    $(package)_ldflags+=-static-libstdc++ -lc++abi
+  endif
 endif
 
 endef

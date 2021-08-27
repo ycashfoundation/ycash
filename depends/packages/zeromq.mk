@@ -1,12 +1,14 @@
 package=zeromq
 $(package)_version=4.3.4
-$(package)_download_path=https://github.com/zeromq/libzmq/releases/download/v$($(package)_version)/
+$(package)_download_path=https://github.com/zeromq/libzmq/releases/download/v$($(package)_version)
 $(package)_file_name=$(package)-$($(package)_version).tar.gz
 $(package)_sha256_hash=c593001a89f5a85dd2ddf564805deb860e02471171b3f204944857336295c3e5
 $(package)_patches=windows-unused-variables.diff
 
-ifneq ($(host_os),darwin)
-$(package)_dependencies=libcxx
+ifneq ($(YCASH_TOOLCHAIN), GCC)
+  ifneq ($(host_os),darwin)
+    $(package)_dependencies=libcxx
+  endif
 endif
 
 define $(package)_set_vars
@@ -18,10 +20,12 @@ define $(package)_set_vars
   $(package)_config_opts_freebsd=--with-pic
   $(package)_cxxflags+=-std=c++17
 
-  ifeq ($(host_os),freebsd)
-    $(package)_ldflags+=-static-libstdc++ -lcxxrt
-  else
-    $(package)_ldflags+=-static-libstdc++ -lc++abi
+  ifneq ($(YCASH_TOOLCHAIN), GCC)
+    ifeq ($(host_os),freebsd)
+      $(package)_ldflags+=-static-libstdc++ -lcxxrt
+    else
+      $(package)_ldflags+=-static-libstdc++ -lc++abi
+    endif
   endif
 
 endef

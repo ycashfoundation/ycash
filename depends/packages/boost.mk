@@ -6,8 +6,10 @@ $(package)_sha256_hash=83bfc1507731a0906e387fc28b7ef5417d591429e51e788417fe9ff02
 $(package)_dependencies=native_b2
 $(package)_patches=iostreams-106.patch signals2-noise.patch deprecated-two-arg-allocate.diff
 
-ifneq ($(host_os),darwin)
-$(package)_dependencies+=libcxx
+ifneq ($(YCASH_TOOLCHAIN), GCC)
+  ifneq ($(host_os),darwin)
+    $(package)_dependencies+=libcxx
+  endif
 endif
 
 define $(package)_set_vars
@@ -23,20 +25,24 @@ $(package)_config_opts_x86_64=architecture=x86 address-model=64
 $(package)_config_opts_i686=architecture=x86 address-model=32
 $(package)_config_opts_aarch64=address-model=64
 $(package)_config_opts_armv7a=address-model=32
-ifneq (,$(findstring clang,$($(package)_cxx)))
-$(package)_toolset_$(host_os)=clang
+
+ifneq ($(YCASH_TOOLCHAIN), GCC)
+  $(package)_toolset_$(host_os)=clang
 else
-$(package)_toolset_$(host_os)=gcc
+  $(package)_toolset_$(host_os)=gcc
 endif
+
 $(package)_config_libraries=chrono,filesystem,program_options,system,thread,test
 $(package)_cxxflags+=-std=c++17 -fvisibility=hidden
 $(package)_cxxflags_linux=-fPIC
 $(package)_cxxflags_freebsd=-fPIC
 
-ifeq ($(host_os),freebsd)
-  $(package)_ldflags+=-static-libstdc++ -lcxxrt
-else
-  $(package)_ldflags+=-static-libstdc++ -lc++abi
+ifneq ($(YCASH_TOOLCHAIN), GCC)
+  ifeq ($(host_os),freebsd)
+    $(package)_ldflags+=-static-libstdc++ -lcxxrt
+  else
+    $(package)_ldflags+=-static-libstdc++ -lc++abi
+  endif
 endif
 
 endef
@@ -60,11 +66,13 @@ define $(package)_stage_cmds
   b2 -d0 -j4 --prefix=$($(package)_staging_prefix_dir) $($(package)_config_opts) toolset=$($(package)_toolset_$(host_os)) install
 endef
 
-# Boost uses the MSVC convention of libboost_foo.lib as the naming pattern when
-# compiling for Windows, even though we use MinGW which follows the libfoo.a
-# convention. This causes issues with lld, so we rename all .lib files to .a.
-ifeq ($(host_os),mingw32)
-define $(package)_postprocess_cmds
-  for f in lib/*.lib; do mv -- "$$$$f" "$$$${f%.lib}.a"; done
-endef
+ifneq ($(YCASH_TOOLCHAIN), GCC)
+  # Boost uses the MSVC convention of libboost_foo.lib as the naming pattern when
+  # compiling for Windows, even though we use MinGW which follows the libfoo.a
+  # convention. This causes issues with lld, so we rename all .lib files to .a.
+  ifeq ($(host_os),mingw32)
+    define $(package)_postprocess_cmds
+      for f in lib/*.lib; do mv -- "$$$$f" "$$$${f%.lib}.a"; done
+    endef
+  endif
 endif

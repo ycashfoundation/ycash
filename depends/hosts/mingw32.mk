@@ -1,7 +1,13 @@
 mingw32_CFLAGS=-pipe
-mingw32_CXXFLAGS=$(mingw32_CFLAGS) -isystem $(host_prefix)/include/c++/v1
+mingw32_CXXFLAGS=$(mingw32_CFLAGS)
 
-mingw32_LDFLAGS?=-fuse-ld=lld
+ifneq ($(YCASH_TOOLCHAIN), GCC)
+  mingw32_CXXFLAGS += -isystem $(host_prefix)/include/c++/v1
+  mingw32_LDFLAGS?=-fuse-ld=lld
+else
+  mingw32_CC = $(host_toolchain)gcc-posix
+  mingw32_CXX = $(host_toolchain)g++-posix
+endif
 
 mingw32_release_CFLAGS=-O3
 mingw32_release_CXXFLAGS=$(mingw32_release_CFLAGS)

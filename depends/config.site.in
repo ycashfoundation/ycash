@@ -33,10 +33,18 @@ export PKG_CONFIG_PATH=$depends_prefix/share/pkgconfig
 
 CPPFLAGS="-I$depends_prefix/include/ $CPPFLAGS"
 
-if test x@host_os@ = xfreebsd; then
-  LDFLAGS="-L$depends_prefix/lib $LDFLAGS -static-libstdc++ -lcxxrt"
+if test x$YCASH_TOOLCHAIN = xGCC; then
+  if test x@host_os@ = xfreebsd; then
+    LDFLAGS="-L$depends_prefix/lib $LDFLAGS"
+  else
+    LDFLAGS="-L$depends_prefix/lib $LDFLAGS"
+  fi
 else
-  LDFLAGS="-L$depends_prefix/lib $LDFLAGS -static-libstdc++ -lc++abi"
+  if test x@host_os@ = xfreebsd; then
+    LDFLAGS="-L$depends_prefix/lib $LDFLAGS -static-libstdc++ -lcxxrt"
+  else
+    LDFLAGS="-L$depends_prefix/lib $LDFLAGS -static-libstdc++ -lc++abi"
+  fi
 fi
 
 CC="@CC@"

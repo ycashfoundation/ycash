@@ -4,7 +4,9 @@ $(package)_download_path=https://github.com/tpoechtrager/cctools-port/archive
 $(package)_file_name=$($(package)_version).tar.gz
 $(package)_sha256_hash=e51995a843533a3dac155dd0c71362dd471597a2d23f13dff194c6285362f875
 $(package)_build_subdir=cctools
-$(package)_dependencies=native_clang
+ifneq ($(YCASH_TOOLCHAIN), GCC)
+  $(package)_dependencies=native_clang
+endif
 $(package)_patches=ignore-otool.diff
 
 $(package)_libtapi_version=3efb201881e7a76a21e0554906cf306432539cef
@@ -33,9 +35,12 @@ endef
 define $(package)_set_vars
   $(package)_config_opts=--target=$(host) --with-libtapi=$($(package)_extract_dir)
   $(package)_ldflags+=-Wl,-rpath=\\$$$$$$$$\$$$$$$$$ORIGIN/../lib
-  $(package)_config_opts+=--enable-lto-support --with-llvm-config=$(build_prefix)/bin/llvm-config
-  $(package)_cc=$(build_prefix)/bin/clang
-  $(package)_cxx=$(build_prefix)/bin/clang++
+  $(package)_config_opts+=--enable-lto-support
+  ifneq ($(YCASH_TOOLCHAIN), GCC)
+    $(package)_config_opts += --with-llvm-config=$(build_prefix)/bin/llvm-config
+    $(package)_cc=$(build_prefix)/bin/clang
+    $(package)_cxx=$(build_prefix)/bin/clang++
+  endif
 endef
 
 define $(package)_preprocess_cmds
