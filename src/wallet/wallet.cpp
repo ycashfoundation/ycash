@@ -638,10 +638,7 @@ void CWallet::ChainTipAdded(const CBlockIndex *pindex,
             loc = chainActive.GetLocator(pindex);
         }
 
-        {
-            LOCK(cs_wallet);
-            SetBestChain(loc);
-        }
+        SetBestChain(loc);
     }
 }
 
@@ -1551,7 +1548,8 @@ int CWallet::SaplingWitnessMinimumHeight(const uint256& nullifier, int nWitnessH
 
 int CWallet::VerifyAndSetInitialWitness(const CBlockIndex* pindex, bool witnessOnly)
 {
-    LOCK2(cs_main, cs_wallet);
+    AssertLockHeld(cs_main);
+    AssertLockHeld(cs_wallet);
 
     int nWitnessTxIncrement = 0;
     int nWitnessTotalTxCount = mapWallet.size();
