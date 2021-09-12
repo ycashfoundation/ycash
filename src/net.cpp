@@ -2064,6 +2064,9 @@ void RelayTransaction(const CTransaction& tx)
 
 void RelayTransaction(const CTransaction& tx, const CDataStream& ss)
 {
+    LogPrint("wr", "RelayTransaction() enter\n");
+    uint64_t nTime1 = GetTimeMicros();
+
     CInv inv(MSG_TX, tx.GetHash());
     {
         LOCK(cs_mapRelay);
@@ -2092,6 +2095,9 @@ void RelayTransaction(const CTransaction& tx, const CDataStream& ss)
         } else
             pnode->PushInventory(inv);
     }
+
+    uint64_t nTime2 = GetTimeMicros();
+    LogPrint("wr", "RelayTransaction() leave after %.2f ms\n", (nTime2 - nTime1) * 0.001);
 }
 
 void CNode::RecordBytesRecv(uint64_t bytes)

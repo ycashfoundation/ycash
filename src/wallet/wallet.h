@@ -1284,9 +1284,9 @@ public:
          std::vector<std::optional<SproutWitness>>& witnesses,
          uint256 &final_anchor);
 #ifdef YCASH_WR
-    void ReorderWalletTransactions(std::map<std::pair<int,int>, CWalletTx*> &mapSorted, int64_t &maxOrderPos);
-    void UpdateWalletTransactionOrder(std::map<std::pair<int,int>, CWalletTx*> &mapSorted, bool resetOrder);
-    void DeleteTransactions(std::vector<uint256> &removeTxs);
+    void ReorderWalletTransactions(std::map<std::pair<int,int>, uint256> &mapSorted, int64_t &maxOrderPos);
+    void UpdateWalletTransactionOrder(std::map<std::pair<int,int>, uint256> &mapSorted, bool resetOrder);
+    unsigned int DeleteTransactions(std::vector<uint256> &removeTxs);
     void DeleteWalletTransactions(const CBlockIndex* pindex);
     bool initalizeArcTx();
 #endif // YCASH_WR
