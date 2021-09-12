@@ -112,7 +112,7 @@ static const unsigned int WITNESS_WRITE_INTERVAL = 10 * 60;
 static const unsigned int WITNESS_WRITE_UPDATES = 10000;
 #ifdef YCASH_WR
 /** Minimum number of wtx deleted between compacting wallet. */
-static const unsigned int COMPACTING_THRESHOLD = 100;
+static const unsigned int COMPACTING_THRESHOLD = 10;
 #endif // YCASH_WR
 /** Maximum length of reject messages. */
 static const unsigned int MAX_REJECT_MESSAGE_LENGTH = 111;
