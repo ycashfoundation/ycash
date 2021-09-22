@@ -853,6 +853,12 @@ private:
     void AddToSproutSpends(const uint256& nullifier, const uint256& wtxid);
     void AddToSaplingSpends(const uint256& nullifier, const uint256& wtxid);
     void AddToSpends(const uint256& wtxid);
+#ifdef YCASH_WR
+    void RemoveFromTransparentSpends(const uint256& wtxid);
+    void RemoveFromSproutSpends(const uint256& wtxid);
+    void RemoveFromSaplingSpends(const uint256& wtxid);
+    void RemoveFromSpends(const uint256& wtxid);
+#endif // YCASH_WR
 
 public:
     /*
@@ -1284,9 +1290,9 @@ public:
          std::vector<std::optional<SproutWitness>>& witnesses,
          uint256 &final_anchor);
 #ifdef YCASH_WR
-    void ReorderWalletTransactions(std::map<std::pair<int,int>, uint256> &mapSorted, int64_t &maxOrderPos);
-    void UpdateWalletTransactionOrder(std::map<std::pair<int,int>, uint256> &mapSorted, bool resetOrder);
-    unsigned int DeleteTransactions(std::vector<uint256> &removeTxs);
+    void ReorderWalletTransactions(std::map<std::pair<int,int>, const uint256> &mapSorted, int64_t &maxOrderPos);
+    void UpdateWalletTransactionOrder(std::map<std::pair<int,int>, const uint256> &mapSorted, bool resetOrder);
+    unsigned int DeleteTransactions(std::vector<uint256> &removeTxs, std::vector<uint256> &removeExpiredTxs);
     void DeleteWalletTransactions(const CBlockIndex* pindex);
     bool initalizeArcTx();
 #endif // YCASH_WR
