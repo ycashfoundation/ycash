@@ -6,6 +6,9 @@ $(package)_sha256_hash=$(boost_sha256_hash)
 $(package)_build_subdir=tools/build/src/engine
 
 ifneq ($(YCASH_TOOLCHAIN), GCC)
+  ifneq ($(host_os),darwin)
+    $(package)_dependencies=native_clang
+  endif
   $(package)_toolset_$(host_os)=clang
 else
   $(package)_toolset_$(host_os)=gcc
