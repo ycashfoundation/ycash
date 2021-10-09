@@ -42,6 +42,7 @@ HASH_LENGTH:=11
 DOWNLOAD_CONNECT_TIMEOUT:=10
 DOWNLOAD_RETRIES:=3
 CRATE_REGISTRY:=vendored-sources
+CRATE_ARCHIVE = $(SOURCES_PATH)/vendored-crates.tar.gz
 
 host:=$(BUILD)
 ifneq ($(HOST),)
@@ -115,8 +116,6 @@ $(host_arch)_$(host_os)_native_toolchain?=$($(host_os)_native_toolchain)
 
 include funcs.mk
 
-CRATE_ARCHIVE = $(SOURCES_PATH)/$(vendored_crates_file_name)
-
 binutils_path=$($($(host_arch)_$(host_os)_native_binutils)_prefixbin)
 toolchain_path=$($($(host_arch)_$(host_os)_native_toolchain)_prefixbin)
 final_build_id_long+=$(shell $(build_SHA256SUM) config.site.in)
@@ -131,7 +130,7 @@ $(host_prefix)/.stamp_$(final_build_id): $(native_packages) $(packages)
 	then echo Extracting pre-vendored crates from $(CRATE_ARCHIVE)...; \
 		tar xf $(CRATE_ARCHIVE) -C $(@D); \
 	else echo Vendoring crates...; \
-		$(@D)/native/bin/cargo vendor --locked --manifest-path $(BASEDIR)/../Cargo.toml $(@D)/$(CRATE_REGISTRY); \
+		$(@D)/native/bin/cargo vendor --manifest-path $(BASEDIR)/../Cargo.toml $(@D)/$(CRATE_REGISTRY); \
 	fi
 	$(AT)touch $@
 

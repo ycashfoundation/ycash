@@ -57,3 +57,6 @@ features = ["ansi", "chrono", "env-filter"]
 lto = true
 panic = 'abort'
 codegen-units = 1
+
+[patch.crates-io]
+zcash_primitives = { git = "https://github.com/ycashfoundation/librustzcash.git", rev = "82aec231340bd9ff18d804614d41712696c5ff2a" }

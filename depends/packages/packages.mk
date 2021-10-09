@@ -1,5 +1,5 @@
 zcash_packages := libsodium utfcpp
-packages := boost libevent zeromq $(zcash_packages) vendored_crates googletest
+packages := boost libevent zeromq $(zcash_packages) googletest
 ifneq ($(YCASH_TOOLCHAIN), GCC)
   native_packages := native_clang native_ccache native_rust
 else

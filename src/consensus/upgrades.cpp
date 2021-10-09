@@ -35,17 +35,17 @@ const struct NUInfo NetworkUpgradeInfo[Consensus::MAX_NETWORK_UPGRADES] = {
         .strInfo = "See YCash for details.",
     },
     {
-        .nBranchId = 0x2bb40e60,
+        .nBranchId = 0x8e471bd6,
         .strName = "Blossom",
         .strInfo = "See https://z.cash/upgrade/blossom.html for details.",
     },
     {
-        .nBranchId = 0xf5b9230b,
+        .nBranchId = 0x66314da3,
         .strName = "Heartwood",
         .strInfo = "See https://z.cash/upgrade/heartwood/ for details.",
     },
     {
-        .nBranchId = 0xe9ff75a6,
+        .nBranchId = 0x19bd2d2f,
         .strName = "Canopy",
         .strInfo = "See https://z.cash/upgrade/canopy/ for details.",
     },

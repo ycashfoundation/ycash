@@ -377,16 +377,13 @@ public:
             uint256S("0305d164e8f4dc75b9e9a6a15b7b381dbc1c9cb55f1534267be7c125923255c8");
         
         consensus.vUpgrades[Consensus::UPGRADE_BLOSSOM].nProtocolVersion = 270008;
-        consensus.vUpgrades[Consensus::UPGRADE_BLOSSOM].nActivationHeight =             
-            Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
+        consensus.vUpgrades[Consensus::UPGRADE_BLOSSOM].nActivationHeight = 661100;
 
         consensus.vUpgrades[Consensus::UPGRADE_HEARTWOOD].nProtocolVersion = 270010;
-        consensus.vUpgrades[Consensus::UPGRADE_HEARTWOOD].nActivationHeight =
-            Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
+        consensus.vUpgrades[Consensus::UPGRADE_HEARTWOOD].nActivationHeight = 661112;
 
         consensus.vUpgrades[Consensus::UPGRADE_CANOPY].nProtocolVersion = 270012;
-        consensus.vUpgrades[Consensus::UPGRADE_CANOPY].nActivationHeight =
-            Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
+        consensus.vUpgrades[Consensus::UPGRADE_CANOPY].nActivationHeight = 661124;
 
         consensus.vUpgrades[Consensus::UPGRADE_NU5].nProtocolVersion = 270014;
         consensus.vUpgrades[Consensus::UPGRADE_NU5].nActivationHeight =
@@ -444,22 +441,10 @@ public:
         keyConstants.bech32HRPs[LEGACY_SAPLING_EXTENDED_SPEND_KEY]   = "secret-extended-key-test";
         keyConstants.bech32HRPs[LEGACY_SAPLING_EXTENDED_FVK]         = "zxviewtestsapling";
 
-        // On testnet we activate this rule 6 blocks after Blossom activation. From block 299188 and
-        // prior to Blossom activation, the testnet minimum-difficulty threshold was 15 minutes (i.e.
-        // a minimum difficulty block can be mined if no block is mined normally within 15 minutes):
-        // <https://zips.z.cash/zip-0205#change-to-difficulty-adjustment-on-testnet>
-        // However the median-time-past is 6 blocks behind, and the worst-case time for 7 blocks at a
-        // 15-minute spacing is ~105 minutes, which exceeds the limit imposed by the soft fork of
-        // 90 minutes.
-        //
-        // After Blossom, the minimum difficulty threshold time is changed to 6 times the block target
-        // spacing, which is 7.5 minutes:
-        // <https://zips.z.cash/zip-0208#minimum-difficulty-blocks-on-the-test-network>
-        // 7 times that is 52.5 minutes which is well within the limit imposed by the soft fork.
-
+        // On testnet we activate this rule at the same height as Blossom activation.
         static_assert(6 * Consensus::POST_BLOSSOM_POW_TARGET_SPACING * 7 < MAX_FUTURE_BLOCK_TIME_MTP - 60,
                       "MAX_FUTURE_BLOCK_TIME_MTP is too low given block target spacing");
-        consensus.nFutureTimestampSoftForkHeight = INT_MAX;
+        consensus.nFutureTimestampSoftForkHeight = consensus.vUpgrades[Consensus::UPGRADE_BLOSSOM].nActivationHeight;
 
         // The best chain should have at least this much work.
         consensus.nMinimumChainWork = uint256S("0x0000000000000000000000000000000000000000000000000000001958c35a99");
