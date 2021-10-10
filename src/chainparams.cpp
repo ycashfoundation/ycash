@@ -377,13 +377,13 @@ public:
             uint256S("0305d164e8f4dc75b9e9a6a15b7b381dbc1c9cb55f1534267be7c125923255c8");
         
         consensus.vUpgrades[Consensus::UPGRADE_BLOSSOM].nProtocolVersion = 270008;
-        consensus.vUpgrades[Consensus::UPGRADE_BLOSSOM].nActivationHeight = 661100;
+        consensus.vUpgrades[Consensus::UPGRADE_BLOSSOM].nActivationHeight = 661610; // Around October 30, 2021, 2PM GMT
 
         consensus.vUpgrades[Consensus::UPGRADE_HEARTWOOD].nProtocolVersion = 270010;
-        consensus.vUpgrades[Consensus::UPGRADE_HEARTWOOD].nActivationHeight = 661112;
+        consensus.vUpgrades[Consensus::UPGRADE_HEARTWOOD].nActivationHeight = 661622;
 
         consensus.vUpgrades[Consensus::UPGRADE_CANOPY].nProtocolVersion = 270012;
-        consensus.vUpgrades[Consensus::UPGRADE_CANOPY].nActivationHeight = 661124;
+        consensus.vUpgrades[Consensus::UPGRADE_CANOPY].nActivationHeight = 661634;
 
         consensus.vUpgrades[Consensus::UPGRADE_NU5].nProtocolVersion = 270014;
         consensus.vUpgrades[Consensus::UPGRADE_NU5].nActivationHeight =
