@@ -5,13 +5,15 @@
 #include "transaction_builder.h"
 
 #include "main.h"
+#include "proof_verifier.h"
 #include "pubkey.h"
 #include "rpc/protocol.h"
 #include "script/sign.h"
 #include "utilmoneystr.h"
+#include "zcash/Note.hpp"
 
-#include <boost/variant.hpp>
 #include <librustzcash.h>
+#include <rust/ed25519.h>
 
 SpendDescriptionInfo::SpendDescriptionInfo(
     libzcash::SaplingExpandedSpendingKey expsk,
@@ -22,17 +24,115 @@ SpendDescriptionInfo::SpendDescriptionInfo(
     librustzcash_sapling_generate_r(alpha.begin());
 }
 
+std::optional<OutputDescription> OutputDescriptionInfo::Build(void* ctx) {
+    auto cmu = this->note.cmu();
+    if (!cmu) {
+        return std::nullopt;
+    }
+
+    libzcash::SaplingNotePlaintext notePlaintext(this->note, this->memo);
+
+    auto res = notePlaintext.encrypt(this->note.pk_d);
+    if (!res) {
+        return std::nullopt;
+    }
+    auto enc = res.value();
+    auto encryptor = enc.second;
+
+    libzcash::SaplingPaymentAddress address(this->note.d, this->note.pk_d);
+    CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
+    ss << address;
+    std::vector<unsigned char> addressBytes(ss.begin(), ss.end());
+
+    OutputDescription odesc;
+    uint256 rcm = this->note.rcm();
+    if (!librustzcash_sapling_output_proof(
+            ctx,
+            encryptor.get_esk().begin(),
+            addressBytes.data(),
+            rcm.begin(),
+            this->note.value(),
+            odesc.cv.begin(),
+            odesc.zkproof.begin())) {
+        return std::nullopt;
+    }
+
+    odesc.cmu = *cmu;
+    odesc.ephemeralKey = encryptor.get_epk();
+    odesc.encCiphertext = enc.first;
+
+    libzcash::SaplingOutgoingPlaintext outPlaintext(this->note.pk_d, encryptor.get_esk());
+    odesc.outCiphertext = outPlaintext.encrypt(
+        this->ovk,
+        odesc.cv,
+        odesc.cmu,
+        encryptor);
+
+    return odesc;
+}
+
+JSDescription JSDescriptionInfo::BuildDeterministic(
+    bool computeProof,
+    uint256 *esk // payment disclosure
+) {
+    JSDescription jsdesc;
+    jsdesc.vpub_old = vpub_old;
+    jsdesc.vpub_new = vpub_new;
+    jsdesc.anchor = anchor;
+
+    std::array<libzcash::SproutNote, ZC_NUM_JS_OUTPUTS> notes;
+    jsdesc.proof = ZCJoinSplit::prove(
+        inputs,
+        outputs,
+        notes,
+        jsdesc.ciphertexts,
+        jsdesc.ephemeralKey,
+        joinSplitPubKey,
+        jsdesc.randomSeed,
+        jsdesc.macs,
+        jsdesc.nullifiers,
+        jsdesc.commitments,
+        vpub_old,
+        vpub_new,
+        anchor,
+        computeProof,
+        esk // payment disclosure
+    );
+
+    return jsdesc;
+}
+
+JSDescription JSDescriptionInfo::BuildRandomized(
+    std::array<size_t, ZC_NUM_JS_INPUTS>& inputMap,
+    std::array<size_t, ZC_NUM_JS_OUTPUTS>& outputMap,
+    bool computeProof,
+    uint256 *esk, // payment disclosure
+    std::function<int(int)> gen
+)
+{
+    // Randomize the order of the inputs and outputs
+    inputMap = {0, 1};
+    outputMap = {0, 1};
+
+    assert(gen);
+
+    MappedShuffle(inputs.begin(), inputMap.begin(), ZC_NUM_JS_INPUTS, gen);
+    MappedShuffle(outputs.begin(), outputMap.begin(), ZC_NUM_JS_OUTPUTS, gen);
+
+    return BuildDeterministic(computeProof, esk);
+}
+
 TransactionBuilderResult::TransactionBuilderResult(const CTransaction& tx) : maybeTx(tx) {}
 
 TransactionBuilderResult::TransactionBuilderResult(const std::string& error) : maybeError(error) {}
 
-bool TransactionBuilderResult::IsTx() { return maybeTx != boost::none; }
+bool TransactionBuilderResult::IsTx() { return maybeTx != std::nullopt; }
 
-bool TransactionBuilderResult::IsError() { return maybeError != boost::none; }
+bool TransactionBuilderResult::IsError() { return maybeError != std::nullopt; }
 
 CTransaction TransactionBuilderResult::GetTxOrThrow() {
     if (maybeTx) {
-        return maybeTx.get();
+        return maybeTx.value();
     } else {
         throw JSONRPCError(RPC_WALLET_ERROR, "Failed to build transaction: " + GetError());
     }
@@ -40,7 +140,7 @@ CTransaction TransactionBuilderResult::GetTxOrThrow() {
 
 std::string TransactionBuilderResult::GetError() {
     if (maybeError) {
-        return maybeError.get();
+        return maybeError.value();
     } else {
         // This can only happen if isTx() is true in which case we should not call getError()
         throw std::runtime_error("getError() was called in TransactionBuilderResult, but the result was not initialized as an error.");
@@ -51,13 +151,11 @@ TransactionBuilder::TransactionBuilder(
     const Consensus::Params& consensusParams,
     int nHeight,
     CKeyStore* keystore,
-    ZCJoinSplit* sproutParams,
     CCoinsViewCache* coinsView,
     CCriticalSection* cs_coinsView) :
     consensusParams(consensusParams),
     nHeight(nHeight),
     keystore(keystore),
-    sproutParams(sproutParams),
     coinsView(coinsView),
     cs_coinsView(cs_coinsView)
 {
@@ -115,7 +213,13 @@ void TransactionBuilder::AddSaplingOutput(
         throw std::runtime_error("TransactionBuilder cannot add Sapling output to pre-Sapling transaction");
     }
 
-    auto note = libzcash::SaplingNote(to, value);
+    libzcash::Zip212Enabled zip_212_enabled = libzcash::Zip212Enabled::BeforeZip212;
+    // We use nHeight = chainActive.Height() + 1 since the output will be included in the next block
+    if (Params().GetConsensus().NetworkUpgradeActive(nHeight, Consensus::UPGRADE_CANOPY)) {
+        zip_212_enabled = libzcash::Zip212Enabled::AfterZip212;
+    }
+
+    auto note = libzcash::SaplingNote(to, value, zip_212_enabled);
     outputs.emplace_back(ovk, note, memo);
     mtx.valueBalance -= value;
 }
@@ -125,10 +229,6 @@ void TransactionBuilder::AddSproutInput(
     libzcash::SproutNote note,
     SproutWitness witness)
 {
-    if (sproutParams == nullptr) {
-        throw std::runtime_error("Cannot add Sprout inputs to a TransactionBuilder without Sprout params");
-    }
-
     // Consistency check: all anchors must equal the first one
     if (!jsInputs.empty()) {
         if (jsInputs[0].witness.root() != witness.root()) {
@@ -144,10 +244,6 @@ void TransactionBuilder::AddSproutOutput(
     CAmount value,
     std::array<unsigned char, ZC_MEMO_SIZE> memo)
 {
-    if (sproutParams == nullptr) {
-        throw std::runtime_error("Cannot add Sprout outputs to a TransactionBuilder without Sprout params");
-    }
-
     libzcash::JSOutput jsOutput(to, value);
     jsOutput.memo = memo;
     jsOutputs.push_back(jsOutput);
@@ -163,7 +259,7 @@ void TransactionBuilder::AddTransparentInput(COutPoint utxo, CScript scriptPubKe
     tIns.emplace_back(scriptPubKey, value);
 }
 
-void TransactionBuilder::AddTransparentOutput(CTxDestination& to, CAmount value)
+void TransactionBuilder::AddTransparentOutput(const CTxDestination& to, CAmount value)
 {
     if (!IsValidDestination(to)) {
         throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid output address, not a valid taddr.");
@@ -182,15 +278,15 @@ void TransactionBuilder::SetFee(CAmount fee)
 void TransactionBuilder::SendChangeTo(libzcash::SaplingPaymentAddress changeAddr, uint256 ovk)
 {
     saplingChangeAddr = std::make_pair(ovk, changeAddr);
-    sproutChangeAddr = boost::none;
-    tChangeAddr = boost::none;
+    sproutChangeAddr = std::nullopt;
+    tChangeAddr = std::nullopt;
 }
 
 void TransactionBuilder::SendChangeTo(libzcash::SproutPaymentAddress changeAddr)
 {
     sproutChangeAddr = changeAddr;
-    saplingChangeAddr = boost::none;
-    tChangeAddr = boost::none;
+    saplingChangeAddr = std::nullopt;
+    tChangeAddr = std::nullopt;
 }
 
 void TransactionBuilder::SendChangeTo(CTxDestination& changeAddr)
@@ -200,8 +296,8 @@ void TransactionBuilder::SendChangeTo(CTxDestination& changeAddr)
     }
 
     tChangeAddr = changeAddr;
-    saplingChangeAddr = boost::none;
-    sproutChangeAddr = boost::none;
+    saplingChangeAddr = std::nullopt;
+    sproutChangeAddr = std::nullopt;
 }
 
 TransactionBuilderResult TransactionBuilder::Build()
@@ -240,7 +336,7 @@ TransactionBuilderResult TransactionBuilder::Build()
         if (saplingChangeAddr) {
             AddSaplingOutput(saplingChangeAddr->first, saplingChangeAddr->second, change);
         } else if (sproutChangeAddr) {
-            AddSproutOutput(sproutChangeAddr.get(), change);
+            AddSproutOutput(sproutChangeAddr.value(), change);
         } else if (tChangeAddr) {
             // tChangeAddr has already been validated.
             AddTransparentOutput(tChangeAddr.value(), change);
@@ -265,7 +361,7 @@ TransactionBuilderResult TransactionBuilder::Build()
 
     // Create Sapling SpendDescriptions
     for (auto spend : spends) {
-        auto cm = spend.note.cm();
+        auto cm = spend.note.cmu();
         auto nf = spend.note.nullifier(
             spend.expsk.full_viewing_key(), spend.witness.position());
         if (!cm || !nf) {
@@ -278,12 +374,13 @@ TransactionBuilderResult TransactionBuilder::Build()
         std::vector<unsigned char> witness(ss.begin(), ss.end());
 
         SpendDescription sdesc;
+        uint256 rcm = spend.note.rcm();
         if (!librustzcash_sapling_spend_proof(
                 ctx,
                 spend.expsk.full_viewing_key().ak.begin(),
                 spend.expsk.nsk.begin(),
                 spend.note.d.data(),
-                spend.note.r.begin(),
+                rcm.begin(),
                 spend.alpha.begin(),
                 spend.note.value(),
                 spend.anchor.begin(),
@@ -302,59 +399,27 @@ TransactionBuilderResult TransactionBuilder::Build()
 
     // Create Sapling OutputDescriptions
     for (auto output : outputs) {
-        auto cm = output.note.cm();
-        if (!cm) {
+        // Check this out here as well to provide better logging.
+        if (!output.note.cmu()) {
             librustzcash_sapling_proving_ctx_free(ctx);
             return TransactionBuilderResult("Output is invalid");
         }
 
-        libzcash::SaplingNotePlaintext notePlaintext(output.note, output.memo);
-
-        auto res = notePlaintext.encrypt(output.note.pk_d);
-        if (!res) {
+        auto odesc = output.Build(ctx);
+        if (!odesc) {
             librustzcash_sapling_proving_ctx_free(ctx);
-            return TransactionBuilderResult("Failed to encrypt note");
-        }
-        auto enc = res.get();
-        auto encryptor = enc.second;
-
-        libzcash::SaplingPaymentAddress address(output.note.d, output.note.pk_d);
-        CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
-        ss << address;
-        std::vector<unsigned char> addressBytes(ss.begin(), ss.end());
-
-        OutputDescription odesc;
-        if (!librustzcash_sapling_output_proof(
-                ctx,
-                encryptor.get_esk().begin(),
-                addressBytes.data(),
-                output.note.r.begin(),
-                output.note.value(),
-                odesc.cv.begin(),
-                odesc.zkproof.begin())) {
-            librustzcash_sapling_proving_ctx_free(ctx);
-            return TransactionBuilderResult("Output proof failed");
+            return TransactionBuilderResult("Failed to create output description");
         }
 
-        odesc.cm = *cm;
-        odesc.ephemeralKey = encryptor.get_epk();
-        odesc.encCiphertext = enc.first;
-
-        libzcash::SaplingOutgoingPlaintext outPlaintext(output.note.pk_d, encryptor.get_esk());
-        odesc.outCiphertext = outPlaintext.encrypt(
-            output.ovk,
-            odesc.cv,
-            odesc.cm,
-            encryptor);
-        mtx.vShieldedOutput.push_back(odesc);
+        mtx.vShieldedOutput.push_back(odesc.value());
     }
 
     //
     // Sprout JoinSplits
     //
 
-    unsigned char joinSplitPrivKey[crypto_sign_SECRETKEYBYTES];
-    crypto_sign_keypair(mtx.joinSplitPubKey.begin(), joinSplitPrivKey);
+    Ed25519SigningKey joinSplitPrivKey;
+    ed25519_generate_keypair(&joinSplitPrivKey, &mtx.joinSplitPubKey);
 
     // Create Sprout JSDescriptions
     if (!jsInputs.empty() || !jsOutputs.empty()) {
@@ -402,19 +467,19 @@ TransactionBuilderResult TransactionBuilder::Build()
     librustzcash_sapling_proving_ctx_free(ctx);
 
     // Create Sprout joinSplitSig
-    if (crypto_sign_detached(
-        mtx.joinSplitSig.data(), NULL,
+    if (!ed25519_sign(
+        &joinSplitPrivKey,
         dataToBeSigned.begin(), 32,
-        joinSplitPrivKey) != 0)
+        &mtx.joinSplitSig))
     {
         return TransactionBuilderResult("Failed to create Sprout joinSplitSig");
     }
 
     // Sanity check Sprout joinSplitSig
-    if (crypto_sign_verify_detached(
-        mtx.joinSplitSig.data(),
-        dataToBeSigned.begin(), 32,
-        mtx.joinSplitPubKey.begin()) != 0)
+    if (!ed25519_verify(
+        &mtx.joinSplitPubKey,
+        &mtx.joinSplitSig,
+        dataToBeSigned.begin(), 32))
     {
         return TransactionBuilderResult("Sprout joinSplitSig sanity check failed");
     }
@@ -498,7 +563,7 @@ void TransactionBuilder::CreateJSDescriptions()
     CAmount vpubNewTarget = valueOut > 0 ? valueOut : 0;
 
     // Keep track of treestate within this transaction
-    boost::unordered_map<uint256, SproutMerkleTree, CCoinsKeyHasher> intermediates;
+    boost::unordered_map<uint256, SproutMerkleTree, SaltedTxidHasher> intermediates;
     std::vector<uint256> previousCommitments;
 
     while (!vpubNewProcessed) {
@@ -552,7 +617,7 @@ void TransactionBuilder::CreateJSDescriptions()
 
             assert(changeOutputIndex != -1);
             assert(changeOutputIndex < prevJoinSplit.commitments.size());
-            boost::optional<SproutWitness> changeWitness;
+            std::optional<SproutWitness> changeWitness;
             int n = 0;
             for (const uint256& commitment : prevJoinSplit.commitments) {
                 tree.append(commitment);
@@ -560,7 +625,7 @@ void TransactionBuilder::CreateJSDescriptions()
                 if (!changeWitness && changeOutputIndex == n++) {
                     changeWitness = tree.witness();
                 } else if (changeWitness) {
-                    changeWitness.get().append(commitment);
+                    changeWitness.value().append(commitment);
                 }
             }
             assert(changeWitness.has_value());
@@ -569,7 +634,10 @@ void TransactionBuilder::CreateJSDescriptions()
 
             // Decrypt the change note's ciphertext to retrieve some data we need
             ZCNoteDecryption decryptor(changeKey.receiving_key());
-            auto hSig = prevJoinSplit.h_sig(*sproutParams, mtx.joinSplitPubKey);
+            auto hSig = ZCJoinSplit::h_sig(
+                prevJoinSplit.randomSeed,
+                prevJoinSplit.nullifiers,
+                mtx.joinSplitPubKey);
             try {
                 auto plaintext = libzcash::SproutNotePlaintext::decrypt(
                     decryptor,
@@ -579,7 +647,7 @@ void TransactionBuilder::CreateJSDescriptions()
                     (unsigned char)changeOutputIndex);
 
                 auto note = plaintext.note(changeAddress);
-                vjsin[0] = libzcash::JSInput(changeWitness.get(), note, changeKey);
+                vjsin[0] = libzcash::JSInput(changeWitness.value(), note, changeKey);
 
                 jsInputValue += plaintext.value();
 
@@ -700,22 +768,22 @@ void TransactionBuilder::CreateJSDescription(
 
     // Generate the proof, this can take over a minute.
     assert(mtx.fOverwintered && (mtx.nVersion >= SAPLING_TX_VERSION));
-    JSDescription jsdesc = JSDescription::Randomized(
-            *sproutParams,
+    JSDescription jsdesc = JSDescriptionInfo(
             mtx.joinSplitPubKey,
             vjsin[0].witness.root(),
             vjsin,
             vjsout,
+            vpub_old,
+            vpub_new
+    ).BuildRandomized(
             inputMap,
             outputMap,
-            vpub_old,
-            vpub_new,
             true, //!this->testmode,
             &esk); // parameter expects pointer to esk, so pass in address
 
     {
-        auto verifier = libzcash::ProofVerifier::Strict();
-        if (!jsdesc.Verify(*sproutParams, verifier, mtx.joinSplitPubKey)) {
+        auto verifier = ProofVerifier::Strict();
+        if (!verifier.VerifySprout(jsdesc, mtx.joinSplitPubKey)) {
             throw std::runtime_error("error verifying joinsplit");
         }
     }

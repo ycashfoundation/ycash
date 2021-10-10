@@ -10,39 +10,54 @@
  */
 const struct NUInfo NetworkUpgradeInfo[Consensus::MAX_NETWORK_UPGRADES] = {
     {
-        /*.nBranchId =*/ 0,
-        /*.strName =*/ "Sprout",
-        /*.strInfo =*/ "The Zcash network at launch",
+        .nBranchId = 0,
+        .strName = "Sprout",
+        .strInfo = "The Zcash network at launch",
     },
     {
-        /*.nBranchId =*/ 0x74736554,
-        /*.strName =*/ "Test dummy",
-        /*.strInfo =*/ "Test dummy info",
+        .nBranchId = 0x74736554,
+        .strName = "Test dummy",
+        .strInfo = "Test dummy info",
     },
     {
-        /*.nBranchId =*/ 0x5ba81b19,
-        /*.strName =*/ "Overwinter",
-        /*.strInfo =*/ "See https://z.cash/upgrade/overwinter.html for details.",
+        .nBranchId = 0x5ba81b19,
+        .strName = "Overwinter",
+        .strInfo = "See https://z.cash/upgrade/overwinter/ for details.",
     },
     {
-        /*.nBranchId =*/ 0x76b809bb,
-        /*.strName =*/ "Sapling",
-        /*.strInfo =*/ "See https://z.cash/upgrade/sapling.html for details.",
+        .nBranchId = 0x76b809bb,
+        .strName = "Sapling",
+        .strInfo = "See https://z.cash/upgrade/sapling/ for details.",
     },
     {
-        /*.nBranchId =*/ 0x374d694f,
-        /*.strName =*/ "YCash",
-        /*.strInfo =*/ "See YCash for details.",
+        .nBranchId = 0x374d694f,
+        .strName = "YCash",
+        .strInfo = "See YCash for details.",
     },
     {
-        /*.nBranchId =*/ 0x2bb40e60,
-        /*.strName =*/ "Blossom",
-        /*.strInfo =*/ "See https://z.cash/upgrade/blossom.html for details.",
+        .nBranchId = 0x8e471bd6,
+        .strName = "Blossom",
+        .strInfo = "See https://z.cash/upgrade/blossom.html for details.",
     },
     {
-        /*.nBranchId =*/ 0xf5b9230b,
-        /*.strName =*/ "Heartwood",
-        /*.strInfo =*/ "See https://z.cash/upgrade/heartwood/ for details.",
+        .nBranchId = 0x66314da3,
+        .strName = "Heartwood",
+        .strInfo = "See https://z.cash/upgrade/heartwood/ for details.",
+    },
+    {
+        .nBranchId = 0x19bd2d2f,
+        .strName = "Canopy",
+        .strInfo = "See https://z.cash/upgrade/canopy/ for details.",
+    },
+    {
+        .nBranchId = 0xf919a198,
+        .strName = "NU5",
+        .strInfo = "See https://z.cash/upgrade/nu5/ for details.",
+    },
+    {
+        .nBranchId = 0xffffffff,
+        .strName = "ZFUTURE",
+        .strInfo = "Future network upgrade (integration testing only)",
     }
 };
 
@@ -83,6 +98,35 @@ struct EquihashInfo EquihashUpgradeInfo[Consensus::MAX_NETWORK_UPGRADES] = {
         /* N = */ 192,
         /* K = */   7,
     },
+    // UPGRADE BLOSSOM
+    {
+        // The PoW change code is based on the work done by @bitcartel 
+        // See: https://github.com/zcash/zcash/issues/1211#issuecomment-379882647
+        /* N = */ 192,
+        /* K = */   7,
+    },
+    // UPGRADE HEARTWOOD
+    {
+        // The PoW change code is based on the work done by @bitcartel 
+        // See: https://github.com/zcash/zcash/issues/1211#issuecomment-379882647
+        /* N = */ 192,
+        /* K = */   7,
+    },
+    // UPGRADE CANOPY
+    {
+        // The PoW change code is based on the work done by @bitcartel 
+        // See: https://github.com/zcash/zcash/issues/1211#issuecomment-379882647
+        /* N = */ 192,
+        /* K = */   7,
+    },
+    // UPGRADE NU5
+    {
+        // The PoW change code is based on the work done by @bitcartel 
+        // See: https://github.com/zcash/zcash/issues/1211#issuecomment-379882647
+        /* N = */ 192,
+        /* K = */   7,
+    },
+    // UPGRADE ZFUTURE
     {
         // The PoW change code is based on the work done by @bitcartel 
         // See: https://github.com/zcash/zcash/issues/1211#issuecomment-379882647
@@ -132,6 +176,16 @@ uint32_t CurrentEpochBranchId(int nHeight, const Consensus::Params& params) {
     return NetworkUpgradeInfo[CurrentEpoch(nHeight, params)].nBranchId;
 }
 
+uint32_t PrevEpochBranchId(uint32_t currentBranchId, const Consensus::Params& params) {
+    for (int idx = Consensus::BASE_SPROUT + 1; idx < Consensus::MAX_NETWORK_UPGRADES; idx++) {
+        if (currentBranchId == NetworkUpgradeInfo[idx].nBranchId) {
+            return NetworkUpgradeInfo[idx - 1].nBranchId;
+        }
+    }
+    // Base case
+    return NetworkUpgradeInfo[Consensus::BASE_SPROUT].nBranchId;
+}
+
 bool IsConsensusBranchId(int branchId) {
     for (int idx = Consensus::BASE_SPROUT; idx < Consensus::MAX_NETWORK_UPGRADES; idx++) {
         if (branchId == NetworkUpgradeInfo[idx].nBranchId) {
@@ -173,9 +227,9 @@ bool IsActivationHeightForAnyUpgrade(
     return false;
 }
 
-boost::optional<int> NextEpoch(int nHeight, const Consensus::Params& params) {
+std::optional<int> NextEpoch(int nHeight, const Consensus::Params& params) {
     if (nHeight < 0) {
-        return boost::none;
+        return std::nullopt;
     }
 
     // Sprout is never pending
@@ -185,16 +239,16 @@ boost::optional<int> NextEpoch(int nHeight, const Consensus::Params& params) {
         }
     }
 
-    return boost::none;
+    return std::nullopt;
 }
 
-boost::optional<int> NextActivationHeight(
+std::optional<int> NextActivationHeight(
     int nHeight,
     const Consensus::Params& params)
 {
     auto idx = NextEpoch(nHeight, params);
     if (idx) {
-        return params.vUpgrades[idx.get()].nActivationHeight;
+        return params.vUpgrades[idx.value()].nActivationHeight;
     }
-    return boost::none;
+    return std::nullopt;
 }

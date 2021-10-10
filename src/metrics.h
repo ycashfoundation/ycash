@@ -2,11 +2,15 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or https://www.opensource.org/licenses/mit-license.php .
 
+#ifndef ZCASH_METRICS_H
+#define ZCASH_METRICS_H
+
 #include "uint256.h"
 #include "consensus/params.h"
 
 #include <atomic>
 #include <mutex>
+#include <optional>
 #include <string>
 
 struct AtomicCounter {
@@ -64,14 +68,18 @@ extern AtomicCounter transactionsValidated;
 extern AtomicCounter ehSolverRuns;
 extern AtomicCounter solutionTargetChecks;
 extern AtomicTimer miningTimer;
+extern std::atomic<size_t> nSizeReindexed; // valid only during reindex
+extern std::atomic<size_t> nFullSizeToReindex; // valid only during reindex
 
 void TrackMinedBlock(uint256 hash);
 
 void MarkStartTime();
 double GetLocalSolPS();
 int EstimateNetHeight(const Consensus::Params& params, int currentBlockHeight, int64_t currentBlockTime);
-boost::optional<int64_t> SecondsLeftToNextEpoch(const Consensus::Params& params, int currentHeight);
+std::optional<int64_t> SecondsLeftToNextEpoch(const Consensus::Params& params, int currentHeight);
 std::string DisplayDuration(int64_t time, DurationFormat format);
+std::string DisplaySize(size_t value);
+std::string DisplayHashRate(double value);
 
 void TriggerRefresh();
 
@@ -107,3 +115,5 @@ const std::string METRICS_ART = " \n"
 "                         [0;34;40m [0;30;5;40;100m8[0;1;30;90;47m [0;37;5;47;107m:              8[0;1;30;90;47mt[0;36;5;40;100mt[0;34;40m  [0m                           \n"
 "                           [0;34;40m ;[0;36;5;40;100m [0;1;30;90;47m%[0;1;37;97;47mt8[0;37;5;47;107m88[0;1;37;97;47m8S:[0;1;30;90;47m;8[0;36;5;40;100m [0;30;5;40;100mS[0;34;40m;  [0m                              \n"
 "                               [0;34;40m        [0m                                    \n";
+
+#endif // ZCASH_METRICS_H

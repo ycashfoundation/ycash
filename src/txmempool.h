@@ -13,12 +13,14 @@
 #include "mempool_limit.h"
 #include "primitives/transaction.h"
 #include "sync.h"
+#include "random.h"
 #include "addressindex.h"
 #include "spentindex.h"
 
 #undef foreach
 #include "boost/multi_index_container.hpp"
 #include "boost/multi_index/ordered_index.hpp"
+#include "boost/multi_index/hashed_index.hpp"
 
 class CAutoFile;
 
@@ -150,7 +152,7 @@ public:
         CTxMemPoolEntry,
         boost::multi_index::indexed_by<
             // sorted by txid
-            boost::multi_index::ordered_unique<mempoolentry_txid>,
+            boost::multi_index::hashed_unique<mempoolentry_txid, SaltedTxidHasher>,
             // sorted by fee rate
             boost::multi_index::ordered_non_unique<
                 boost::multi_index::identity<CTxMemPoolEntry>,
@@ -202,7 +204,7 @@ public:
     void removeWithAnchor(const uint256 &invalidRoot, ShieldedType type);
     void removeForReorg(const CCoinsViewCache *pcoins, unsigned int nMemPoolHeight, int flags);
     void removeConflicts(const CTransaction &tx, std::list<CTransaction>& removed);
-    void removeExpired(unsigned int nBlockHeight);
+    std::vector<uint256> removeExpired(unsigned int nBlockHeight);
     void removeForBlock(const std::vector<CTransaction>& vtx, unsigned int nBlockHeight,
                         std::list<CTransaction>& conflicts, bool fCurrentEstimate = true);
     void removeWithoutBranchId(uint32_t nMemPoolBranchId);

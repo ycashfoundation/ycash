@@ -3,14 +3,15 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or https://www.opensource.org/licenses/mit-license.php .
 
-#ifndef BITCOIN_RPCPROTOCOL_H
-#define BITCOIN_RPCPROTOCOL_H
+#ifndef BITCOIN_RPC_PROTOCOL_H
+#define BITCOIN_RPC_PROTOCOL_H
+
+#include "fs.h"
 
 #include <list>
 #include <map>
 #include <stdint.h>
 #include <string>
-#include <boost/filesystem.hpp>
 
 #include <univalue.h>
 
@@ -50,6 +51,10 @@ enum RPCErrorCode
     RPC_VERIFY_REJECTED             = -26, //! Transaction or block was rejected by network rules
     RPC_VERIFY_ALREADY_IN_CHAIN     = -27, //! Transaction already in chain
     RPC_IN_WARMUP                   = -28, //! Client still warming up
+#ifdef YCASH_WR
+    RPC_DISABLED_BEFORE_WITNESSES   = -31, //! Disabled before Note Witnesses have been built
+    RPC_BUILDING_WITNESS_CACHE      = -32, //! Return error while builing witness cache
+#endif // YCASH_WR
 
     //! Aliases for backward compatibility
     RPC_TRANSACTION_ERROR           = RPC_VERIFY_ERROR,
@@ -82,7 +87,7 @@ std::string JSONRPCReply(const UniValue& result, const UniValue& error, const Un
 UniValue JSONRPCError(int code, const std::string& message);
 
 /** Get name of RPC authentication cookie file */
-boost::filesystem::path GetAuthCookieFile();
+fs::path GetAuthCookieFile();
 /** Generate a new RPC authentication cookie and write it to disk */
 bool GenerateAuthCookie(std::string *cookie_out);
 /** Read the RPC authentication cookie from disk */
@@ -90,4 +95,4 @@ bool GetAuthCookie(std::string *cookie_out);
 /** Delete RPC authentication cookie from disk */
 void DeleteAuthCookie();
 
-#endif // BITCOIN_RPCPROTOCOL_H
+#endif // BITCOIN_RPC_PROTOCOL_H

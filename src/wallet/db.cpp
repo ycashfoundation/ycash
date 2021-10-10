@@ -6,6 +6,7 @@
 #include "db.h"
 
 #include "addrman.h"
+#include "fs.h"
 #include "hash.h"
 #include "protocol.h"
 #include "util.h"
@@ -17,14 +18,10 @@
 #include <sys/stat.h>
 #endif
 
-#include <boost/filesystem.hpp>
 #include <boost/thread.hpp>
 #include <boost/version.hpp>
 
 using namespace std;
-
-
-unsigned int nWalletDBUpdated;
 
 
 //
@@ -71,7 +68,7 @@ void CDBEnv::Close()
     EnvShutdown();
 }
 
-bool CDBEnv::Open(const boost::filesystem::path& pathIn)
+bool CDBEnv::Open(const fs::path& pathIn)
 {
     if (fDbEnvInit)
         return true;
@@ -79,9 +76,9 @@ bool CDBEnv::Open(const boost::filesystem::path& pathIn)
     boost::this_thread::interruption_point();
 
     strPath = pathIn.string();
-    boost::filesystem::path pathLogDir = pathIn / "database";
+    fs::path pathLogDir = pathIn / "database";
     TryCreateDirectory(pathLogDir);
-    boost::filesystem::path pathErrorFile = pathIn / "db.log";
+    fs::path pathErrorFile = pathIn / "db.log";
     LogPrintf("CDBEnv::Open: LogDir=%s ErrorFile=%s\n", pathLogDir.string(), pathErrorFile.string());
 
     unsigned int nEnvFlags = 0;
@@ -89,12 +86,29 @@ bool CDBEnv::Open(const boost::filesystem::path& pathIn)
         nEnvFlags |= DB_PRIVATE;
 
     dbenv->set_lg_dir(pathLogDir.string().c_str());
-    dbenv->set_cachesize(0, 0x100000, 1); // 1 MiB should be enough for just the wallet
+    /****************************************************************************************************
+     * Any cache size less than 500MB is automatically increased by 25% to account for cache overhead,  *
+     * cache sizes larger than 500MB are used as specified.                                             *
+     ****************************************************************************************************/
+    u_int32_t bdb_cache_size = GetArg("-bdbcache", DEFAULT_BDB_CACHE_SIZE);
+    if (bdb_cache_size < 1 || bdb_cache_size > 1024)
+    {
+        LogPrintf("-bdbcache %i out of allowed range (1...1024) MB, using default %i MB\n", bdb_cache_size, DEFAULT_BDB_CACHE_SIZE);
+        bdb_cache_size = DEFAULT_BDB_CACHE_SIZE;
+    }
+    u_int32_t gbytes = bdb_cache_size / 1024;
+    u_int32_t bytes = (bdb_cache_size - (gbytes * 1024)) * 0x100000;
+    int ncache = 1;
+    // set cache size
+    dbenv->set_cachesize(gbytes, bytes, ncache);
+    // report actual cache size
+    dbenv->get_cachesize(&gbytes, &bytes, &ncache);
+    LogPrintf("BerkeleyDB cache = %i MB\n", gbytes * 1024 + bytes / 0x100000);
     dbenv->set_lg_bsize(0x10000);
     dbenv->set_lg_max(1048576);
     dbenv->set_lk_max_locks(40000);
     dbenv->set_lk_max_objects(40000);
-    dbenv->set_errfile(fopen(pathErrorFile.string().c_str(), "a")); /// debug
+    dbenv->set_errfile(fsbridge::fopen(pathErrorFile, "a")); /// debug
     dbenv->set_flags(DB_AUTO_COMMIT, 1);
     dbenv->set_flags(DB_TXN_WRITE_NOSYNC, 1);
     dbenv->log_set_config(DB_LOG_AUTO_REMOVE, 1);
@@ -164,6 +178,57 @@ CDBEnv::VerifyResult CDBEnv::Verify(const std::string& strFile, bool (*recoverFu
     bool fRecovered = (*recoverFunc)(*this, strFile);
     return (fRecovered ? RECOVER_OK : RECOVER_FAIL);
 }
+
+#ifdef YCASH_WR
+bool CDBEnv::Compact(const std::string& strFile)
+{
+    LOCK(cs_db);
+
+    DB_COMPACT dbcompact;
+    dbcompact.compact_fillpercent = 80;
+    dbcompact.compact_pages = DB_MAX_PAGES;
+    dbcompact.compact_timeout = 0;
+
+    DB_COMPACT *pdbcompact;
+    pdbcompact = &dbcompact;
+
+    int result = 1;
+    if (mapDb[strFile] != NULL) {
+        Db* pdb = mapDb[strFile];
+        result = pdb->compact(NULL, NULL, NULL, pdbcompact, DB_FREE_SPACE, NULL);
+        // delete pdb;
+        // mapDb[strFile] = NULL;
+
+      switch (result)
+      {
+        case DB_LOCK_DEADLOCK:
+          LogPrint("db","Deadlock %i\n", result);
+          break;
+        case DB_LOCK_NOTGRANTED:
+          LogPrint("db","Lock Not Granted %i\n", result);
+          break;
+        case DB_REP_HANDLE_DEAD:
+          LogPrint("db","Handle Dead %i\n", result);
+          break;
+        case DB_REP_LOCKOUT:
+          LogPrint("db","Rep Lockout %i\n", result);
+          break;
+        case EACCES:
+          LogPrint("db","Eacces %i\n", result);
+          break;
+        case EINVAL:
+          LogPrint("db","Error Invalid %i\n", result);
+          break;
+        case 0:
+          LogPrint("db","Wallet Compact Sucessful\n");
+          break;
+        default:
+          LogPrint("db","Compact result int %i\n", result);
+      }
+    }
+    return (result == 0);
+}
+#endif // YCASH_WR
 
 bool CDBEnv::Salvage(const std::string& strFile, bool fAggressive, std::vector<CDBEnv::KeyValPair>& vResult)
 {
@@ -444,7 +509,7 @@ void CDBEnv::Flush(bool fShutdown)
                 if (!fMockDb)
                     dbenv->lsn_reset(strFile.c_str(), 0);
                 LogPrint("db", "CDBEnv::Flush: %s closed\n", strFile);
-                mapFileUseCount.erase(mi++);
+                mi = mapFileUseCount.erase(mi);
             } else
                 mi++;
         }
@@ -455,7 +520,7 @@ void CDBEnv::Flush(bool fShutdown)
                 dbenv->log_archive(&listp, DB_ARCH_REMOVE);
                 Close();
                 if (!fMockDb)
-                    boost::filesystem::remove_all(boost::filesystem::path(strPath) / "database");
+                    fs::remove_all(fs::path(strPath) / "database");
             }
         }
     }

@@ -1,13 +1,11 @@
-#!/usr/bin/env python
-# Copyright (c) 2015 The Bitcoin Core developers
+#!/usr/bin/env python3
+# Copyright (c) 2015-2016 The Bitcoin Core developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or https://www.opensource.org/licenses/mit-license.php .
 
 #
 # Test ZMQ interface
 #
-
-import sys; assert sys.version_info < (3,), ur"This script does not run under Python 3. Please use Python 2.7.x."
 
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import assert_equal, bytes_to_hex_str, start_nodes
@@ -17,6 +15,10 @@ import struct
 
 class ZMQTest(BitcoinTestFramework):
 
+    def __init__(self):
+        super().__init__()
+        self.num_nodes = 4
+
     port = 28332
 
     def setup_nodes(self):
@@ -25,7 +27,7 @@ class ZMQTest(BitcoinTestFramework):
         self.zmqSubSocket.setsockopt(zmq.SUBSCRIBE, b"hashblock")
         self.zmqSubSocket.setsockopt(zmq.SUBSCRIBE, b"hashtx")
         self.zmqSubSocket.connect("tcp://127.0.0.1:%i" % self.port)
-        return start_nodes(4, self.options.tmpdir, extra_args=[
+        return start_nodes(self.num_nodes, self.options.tmpdir, extra_args=[
             ['-zmqpubhashtx=tcp://127.0.0.1:'+str(self.port), '-zmqpubhashblock=tcp://127.0.0.1:'+str(self.port)],
             [],
             [],
@@ -38,7 +40,7 @@ class ZMQTest(BitcoinTestFramework):
         genhashes = self.nodes[0].generate(1)
         self.sync_all()
 
-        print "listen..."
+        print("listen...")
         msg = self.zmqSubSocket.recv_multipart()
         topic = msg[0]
         body = msg[1]

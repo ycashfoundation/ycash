@@ -1,13 +1,11 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # Copyright (c) 2016 The Zcash developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or https://www.opensource.org/licenses/mit-license.php .
 
-import sys; assert sys.version_info < (3,), ur"This script does not run under Python 3. Please use Python 2.7.x."
-
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import assert_equal, connect_nodes_bi, \
-    initialize_chain_clean, start_nodes
+    start_nodes
 
 
 class GetBlockTemplateTest(BitcoinTestFramework):
@@ -15,12 +13,13 @@ class GetBlockTemplateTest(BitcoinTestFramework):
     Test getblocktemplate.
     '''
 
-    def setup_chain(self):
-        print("Initializing test directory "+self.options.tmpdir)
-        initialize_chain_clean(self.options.tmpdir, 4)
+    def __init__(self):
+        super().__init__()
+        self.num_nodes = 2
+        self.setup_clean_chain = True
 
     def setup_network(self, split=False):
-        self.nodes = start_nodes(2, self.options.tmpdir)
+        self.nodes = start_nodes(self.num_nodes, self.options.tmpdir)
         connect_nodes_bi(self.nodes,0,1)
         self.is_network_split=False
         self.sync_all()

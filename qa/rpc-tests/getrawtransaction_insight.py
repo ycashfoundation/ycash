@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 # Copyright (c) 2019 The Zcash developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or https://www.opensource.org/licenses/mit-license.php .
@@ -11,7 +11,6 @@
 from test_framework.test_framework import BitcoinTestFramework
 
 from test_framework.util import assert_equal
-from test_framework.util import initialize_chain_clean
 from test_framework.util import start_nodes, stop_nodes, connect_nodes
 from test_framework.util import wait_bitcoinds
 
@@ -20,15 +19,16 @@ from test_framework.mininode import COIN
 
 class GetrawtransactionTest(BitcoinTestFramework):
 
-    def setup_chain(self):
-        print("Initializing test directory "+self.options.tmpdir)
-        initialize_chain_clean(self.options.tmpdir, 4)
+    def __init__(self):
+        super().__init__()
+        self.num_nodes = 3
+        self.setup_clean_chain = True
 
     def setup_network(self):
         # -insightexplorer causes spentindex to be enabled (fSpentIndex = true)
 
-        self.nodes = start_nodes(3, self.options.tmpdir,
-            [['-debug', '-txindex', '-experimentalfeatures', '-insightexplorer']]*3)
+        self.nodes = start_nodes(self.num_nodes, self.options.tmpdir,
+            [['-debug', '-txindex', '-experimentalfeatures', '-insightexplorer']] * self.num_nodes)
         connect_nodes(self.nodes[0], 1)
         connect_nodes(self.nodes[0], 2)
 
@@ -65,7 +65,7 @@ class GetrawtransactionTest(BitcoinTestFramework):
         tx_a = self.nodes[2].getrawtransaction(txid_a, 1)
 
         # txid_b is not yet confirmed, so height is invalid (-1)
-        vout = filter(lambda o: o['value'] == 2, tx_a['vout'])
+        vout = list(filter(lambda o: o['value'] == 2, tx_a['vout']))
         assert_equal(vout[0]['spentTxId'], txid_b)
         assert_equal(vout[0]['spentIndex'], 0)
         assert_equal(vout[0]['spentHeight'], -1)
@@ -84,7 +84,7 @@ class GetrawtransactionTest(BitcoinTestFramework):
         assert_equal(tx_a['vin'][0]['value'], 10) # coinbase
         assert_equal(tx_a['vin'][0]['valueSat'], 10*COIN)
         # we want the non-change (payment) output
-        vout = filter(lambda o: o['value'] == 2, tx_a['vout'])
+        vout = list(filter(lambda o: o['value'] == 2, tx_a['vout']))
         assert_equal(vout[0]['spentTxId'], txid_b)
         assert_equal(vout[0]['spentIndex'], 0)
         assert_equal(vout[0]['spentHeight'], 107)

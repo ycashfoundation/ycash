@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # Copyright (c) 2019 The Zcash developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or https://www.opensource.org/licenses/mit-license.php .
@@ -26,17 +26,16 @@
 # 7. Verify zcashd rejected the block
 #
 
-import sys; assert sys.version_info < (3,), ur"This script does not run under Python 3. Please use Python 2.7.x."
-
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import (
     assert_equal,
     get_coinbase_address,
     start_node, start_nodes,
     sync_blocks, sync_mempools,
-    initialize_chain_clean, connect_nodes_bi,
+    connect_nodes_bi,
     wait_and_assert_operationid_status,
-    bitcoind_processes
+    bitcoind_processes,
+    check_node_log
 )
 from decimal import Decimal
 
@@ -45,12 +44,13 @@ TURNSTILE_ARGS = ['-experimentalfeatures',
 
 class TurnstileTest (BitcoinTestFramework):
 
-    def setup_chain(self):
-        print("Initializing test directory " + self.options.tmpdir)
-        initialize_chain_clean(self.options.tmpdir, 3)
+    def __init__(self):
+        super().__init__()
+        self.num_nodes = 3
+        self.setup_clean_chain = True
 
     def setup_network(self, split=False):
-        self.nodes = start_nodes(3, self.options.tmpdir)
+        self.nodes = start_nodes(self.num_nodes, self.options.tmpdir)
         connect_nodes_bi(self.nodes,0,1)
         connect_nodes_bi(self.nodes,1,2)
         self.is_network_split=False
@@ -133,17 +133,8 @@ class TurnstileTest (BitcoinTestFramework):
         assert_equal(block["height"], count + 1)
 
         # Stop node 0 and check logs to verify the miner excluded the transaction from the block
-        self.nodes[0].stop()
-        bitcoind_processes[0].wait()
-        logpath = self.options.tmpdir + "/node0/regtest/debug.log"
-        foundErrorMsg = False
-        with open(logpath, "r") as myfile:
-            logdata = myfile.readlines()
-        for logline in logdata:
-            if "CreateNewBlock(): tx " + mytxid + " appears to violate " + POOL_NAME.capitalize() + " turnstile" in logline:
-                foundErrorMsg = True
-                break
-        assert(foundErrorMsg)
+        string_to_find = "CreateNewBlock(): tx " + mytxid + " appears to violate " + POOL_NAME.capitalize() + " turnstile"
+        check_node_log(self, 0, string_to_find)
 
         # Launch node 0 with in-memory size of value pools set to zero.
         self.start_and_sync_node(0, TURNSTILE_ARGS)
@@ -173,25 +164,14 @@ class TurnstileTest (BitcoinTestFramework):
         self.assert_pool_balance(self.nodes[2], POOL_NAME.lower(), Decimal('9'))
 
         # Stop node 0 and check logs to verify the block was rejected as a turnstile violation
-        self.nodes[0].stop()
-        bitcoind_processes[0].wait()
-        logpath = self.options.tmpdir + "/node0/regtest/debug.log"
-        foundConnectBlockErrorMsg = False
-        foundInvalidBlockErrorMsg = False
-        foundConnectTipErrorMsg = False
-        with open(logpath, "r") as myfile:
-            logdata = myfile.readlines()
-        for logline in logdata:
-            if "ConnectBlock(): turnstile violation in " + POOL_NAME.capitalize() + " shielded value pool" in logline:
-                foundConnectBlockErrorMsg = True
-            elif "InvalidChainFound: invalid block=" + newhash in logline:
-                foundInvalidBlockErrorMsg = True
-            elif "ConnectTip(): ConnectBlock " + newhash + " failed" in logline:
-                foundConnectTipErrorMsg = True
-        assert(foundConnectBlockErrorMsg and foundInvalidBlockErrorMsg and foundConnectTipErrorMsg)
-
-        # Launch node 0 without overriding the pool size, so the node can sync with rest of network.
+        string_to_find1 = "ConnectBlock(): turnstile violation in " + POOL_NAME.capitalize() + " shielded value pool"
+        string_to_find2 = "InvalidChainFound: invalid block="
+        string_to_find3 = "ConnectTip(): ConnectBlock " + newhash + " failed"
+        check_node_log(self, 0, string_to_find1, True)
+        check_node_log(self, 0, string_to_find2, False)
+        check_node_log(self, 0, string_to_find3, False)
         self.start_and_sync_node(0)
+
         assert_equal(newhash, self.nodes[0].getbestblockhash())
 
 if __name__ == '__main__':

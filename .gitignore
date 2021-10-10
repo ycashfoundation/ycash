@@ -4,9 +4,10 @@
 src/bitcoin
 src/ycashd
 src/ycash-cli
-src/zcash-gtest
+src/ycash-gtest
 src/ycash-tx
 src/test/test_bitcoin
+zcutil/bin/
 
 *zcashTest.pk
 *zcashTest.vk
@@ -51,9 +52,11 @@ src/univalue/gen
 *.orig
 *.pyc
 *.o
+*.o.tmp
 *.o-*
 .zcash
 *.a
+*.lib
 *.pb.cc
 *.pb.h
 .vscode
@@ -72,6 +75,11 @@ src/univalue/gen
 # Compilation
 Makefile
 
+# Rust
+.cargo/.configured-for-*
+.cargo/config
+target/
+
 # Unit-tests
 Makefile.test
 src/test/buildenv.py
@@ -88,31 +96,30 @@ build
 *.gcda
 /*.info
 test_bitcoin.coverage/
-zcash-gtest.coverage/
+ycash-gtest.coverage/
 total.coverage/
 coverage_percent.txt
+afl-temp
 
 #build tests
 linux-coverage-build
 linux-build
 win32-build
-qa/pull-tester/run-bitcoind-for-test.sh
-qa/pull-tester/tests-config.sh
-qa/pull-tester/cache/*
-qa/pull-tester/test.*/*
+qa/pull-tester/tests_config.py
+qa/pull-tester/tests_config.ini
+qa/cache/*
 
 !src/leveldb*/Makefile
 
 /doc/doxygen/
 
-libzcashconsensus.pc
+libzcash_script.pc
 
 contrib/debian/files
 contrib/debian/substvars
 
-# tex
-ycashprotocol.pdf
-ycashprotocol.aux
-ycashprotocol.*.gz
+src/fuzzing/*/input
 src/fuzzing/*/output
 src/fuzz.cpp
+
+.updatecheck-token

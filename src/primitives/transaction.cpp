@@ -9,128 +9,6 @@
 #include "tinyformat.h"
 #include "utilstrencodings.h"
 
-#include "librustzcash.h"
-
-JSDescription::JSDescription(
-    ZCJoinSplit& params,
-    const uint256& joinSplitPubKey,
-    const uint256& anchor,
-    const std::array<libzcash::JSInput, ZC_NUM_JS_INPUTS>& inputs,
-    const std::array<libzcash::JSOutput, ZC_NUM_JS_OUTPUTS>& outputs,
-    CAmount vpub_old,
-    CAmount vpub_new,
-    bool computeProof,
-    uint256 *esk // payment disclosure
-) : vpub_old(vpub_old), vpub_new(vpub_new), anchor(anchor)
-{
-    std::array<libzcash::SproutNote, ZC_NUM_JS_OUTPUTS> notes;
-
-    proof = params.prove(
-        inputs,
-        outputs,
-        notes,
-        ciphertexts,
-        ephemeralKey,
-        joinSplitPubKey,
-        randomSeed,
-        macs,
-        nullifiers,
-        commitments,
-        vpub_old,
-        vpub_new,
-        anchor,
-        computeProof,
-        esk // payment disclosure
-    );
-}
-
-JSDescription JSDescription::Randomized(
-    ZCJoinSplit& params,
-    const uint256& joinSplitPubKey,
-    const uint256& anchor,
-    std::array<libzcash::JSInput, ZC_NUM_JS_INPUTS>& inputs,
-    std::array<libzcash::JSOutput, ZC_NUM_JS_OUTPUTS>& outputs,
-    std::array<size_t, ZC_NUM_JS_INPUTS>& inputMap,
-    std::array<size_t, ZC_NUM_JS_OUTPUTS>& outputMap,
-    CAmount vpub_old,
-    CAmount vpub_new,
-    bool computeProof,
-    uint256 *esk, // payment disclosure
-    std::function<int(int)> gen
-)
-{
-    // Randomize the order of the inputs and outputs
-    inputMap = {0, 1};
-    outputMap = {0, 1};
-
-    assert(gen);
-
-    MappedShuffle(inputs.begin(), inputMap.begin(), ZC_NUM_JS_INPUTS, gen);
-    MappedShuffle(outputs.begin(), outputMap.begin(), ZC_NUM_JS_OUTPUTS, gen);
-
-    return JSDescription(
-        params, joinSplitPubKey, anchor, inputs, outputs,
-        vpub_old, vpub_new, computeProof,
-        esk // payment disclosure
-    );
-}
-
-class SproutProofVerifier : public boost::static_visitor<bool>
-{
-    ZCJoinSplit& params;
-    libzcash::ProofVerifier& verifier;
-    const uint256& joinSplitPubKey;
-    const JSDescription& jsdesc;
-
-public:
-    SproutProofVerifier(
-        ZCJoinSplit& params,
-        libzcash::ProofVerifier& verifier,
-        const uint256& joinSplitPubKey,
-        const JSDescription& jsdesc
-        ) : params(params), jsdesc(jsdesc), verifier(verifier), joinSplitPubKey(joinSplitPubKey) {}
-
-    bool operator()(const libzcash::PHGRProof& proof) const
-    {
-        // We checkpoint after Sapling activation, so we can skip verification
-        // for all Sprout proofs.
-        return true;
-    }
-
-    bool operator()(const libzcash::GrothProof& proof) const
-    {
-        uint256 h_sig = params.h_sig(jsdesc.randomSeed, jsdesc.nullifiers, joinSplitPubKey);
-
-        return librustzcash_sprout_verify(
-            proof.begin(),
-            jsdesc.anchor.begin(),
-            h_sig.begin(),
-            jsdesc.macs[0].begin(),
-            jsdesc.macs[1].begin(),
-            jsdesc.nullifiers[0].begin(),
-            jsdesc.nullifiers[1].begin(),
-            jsdesc.commitments[0].begin(),
-            jsdesc.commitments[1].begin(),
-            jsdesc.vpub_old,
-            jsdesc.vpub_new
-        );
-    }
-};
-
-bool JSDescription::Verify(
-    ZCJoinSplit& params,
-    libzcash::ProofVerifier& verifier,
-    const uint256& joinSplitPubKey
-) const {
-    auto pv = SproutProofVerifier(params, verifier, joinSplitPubKey, *this);
-    return boost::apply_visitor(pv, proof);
-}
-
-uint256 JSDescription::h_sig(ZCJoinSplit& params, const uint256& joinSplitPubKey) const
-{
-    return params.h_sig(randomSeed, nullifiers, joinSplitPubKey);
-}
-
 std::string COutPoint::ToString() const
 {
     return strprintf("COutPoint(%s, %u)", hash.ToString().substr(0,10), n);
@@ -186,6 +64,7 @@ std::string CTxOut::ToString() const
     return strprintf("CTxOut(nValue=%d.%08d, scriptPubKey=%s)", nValue / COIN, nValue % COIN, HexStr(scriptPubKey).substr(0, 30));
 }
 
+
 CMutableTransaction::CMutableTransaction() : nVersion(CTransaction::SPROUT_MIN_CURRENT_VERSION), fOverwintered(false), nVersionGroupId(0), nExpiryHeight(0), nLockTime(0), valueBalance(0) {}
 CMutableTransaction::CMutableTransaction(const CTransaction& tx) : nVersion(tx.nVersion), fOverwintered(tx.fOverwintered), nVersionGroupId(tx.nVersionGroupId), nExpiryHeight(tx.nExpiryHeight),
                                                                    vin(tx.vin), vout(tx.vout), nLockTime(tx.nLockTime),
@@ -193,7 +72,6 @@ CMutableTransaction::CMutableTransaction(const CTransaction& tx) : nVersion(tx.n
                                                                    vJoinSplit(tx.vJoinSplit), joinSplitPubKey(tx.joinSplitPubKey), joinSplitSig(tx.joinSplitSig),
                                                                    bindingSig(tx.bindingSig)
 {
-    
 }
 
 uint256 CMutableTransaction::GetHash() const
@@ -206,7 +84,12 @@ void CTransaction::UpdateHash() const
     *const_cast<uint256*>(&hash) = SerializeHash(*this);
 }
 
-CTransaction::CTransaction() : nVersion(CTransaction::SPROUT_MIN_CURRENT_VERSION), fOverwintered(false), nVersionGroupId(0), nExpiryHeight(0), vin(), vout(), nLockTime(0), valueBalance(0), vShieldedSpend(), vShieldedOutput(), vJoinSplit(), joinSplitPubKey(), joinSplitSig(), bindingSig() { }
+CTransaction::CTransaction() : nVersion(CTransaction::SPROUT_MIN_CURRENT_VERSION),
+                               fOverwintered(false), nVersionGroupId(0), nExpiryHeight(0),
+                               vin(), vout(), nLockTime(0),
+                               valueBalance(0), vShieldedSpend(), vShieldedOutput(),
+                               vJoinSplit(), joinSplitPubKey(), joinSplitSig(),
+                               bindingSig() { }
 
 CTransaction::CTransaction(const CMutableTransaction &tx) : nVersion(tx.nVersion), fOverwintered(tx.fOverwintered), nVersionGroupId(tx.nVersionGroupId), nExpiryHeight(tx.nExpiryHeight),
                                                             vin(tx.vin), vout(tx.vout), nLockTime(tx.nLockTime),
@@ -230,12 +113,15 @@ CTransaction::CTransaction(
     assert(evilDeveloperFlag);
 }
 
-CTransaction::CTransaction(CMutableTransaction &&tx) : nVersion(tx.nVersion), fOverwintered(tx.fOverwintered), nVersionGroupId(tx.nVersionGroupId),
-                                                       vin(std::move(tx.vin)), vout(std::move(tx.vout)), nLockTime(tx.nLockTime), nExpiryHeight(tx.nExpiryHeight),
+CTransaction::CTransaction(CMutableTransaction &&tx) : nVersion(tx.nVersion),
+                                                       fOverwintered(tx.fOverwintered), nVersionGroupId(tx.nVersionGroupId),
+                                                       vin(std::move(tx.vin)), vout(std::move(tx.vout)),
+                                                       nLockTime(tx.nLockTime), nExpiryHeight(tx.nExpiryHeight),
                                                        valueBalance(tx.valueBalance),
                                                        vShieldedSpend(std::move(tx.vShieldedSpend)), vShieldedOutput(std::move(tx.vShieldedOutput)),
                                                        vJoinSplit(std::move(tx.vJoinSplit)),
-                                                       joinSplitPubKey(std::move(tx.joinSplitPubKey)), joinSplitSig(std::move(tx.joinSplitSig))
+                                                       joinSplitPubKey(std::move(tx.joinSplitPubKey)), joinSplitSig(std::move(tx.joinSplitSig)),
+                                                       bindingSig(std::move(tx.bindingSig))
 {
     UpdateHash();
 }
@@ -252,8 +138,8 @@ CTransaction& CTransaction::operator=(const CTransaction &tx) {
     *const_cast<std::vector<SpendDescription>*>(&vShieldedSpend) = tx.vShieldedSpend;
     *const_cast<std::vector<OutputDescription>*>(&vShieldedOutput) = tx.vShieldedOutput;
     *const_cast<std::vector<JSDescription>*>(&vJoinSplit) = tx.vJoinSplit;
-    *const_cast<uint256*>(&joinSplitPubKey) = tx.joinSplitPubKey;
-    *const_cast<joinsplit_sig_t*>(&joinSplitSig) = tx.joinSplitSig;
+    *const_cast<Ed25519VerificationKey*>(&joinSplitPubKey) = tx.joinSplitPubKey;
+    *const_cast<Ed25519Signature*>(&joinSplitSig) = tx.joinSplitSig;
     *const_cast<binding_sig_t*>(&bindingSig) = tx.bindingSig;
     *const_cast<uint256*>(&hash) = tx.hash;
     return *this;
@@ -379,4 +265,36 @@ std::string CTransaction::ToString() const
     for (unsigned int i = 0; i < vout.size(); i++)
         str += "    " + vout[i].ToString() + "\n";
     return str;
+}
+
+/**
+ * Returns the most recent supported transaction version and version group id,
+ * as of the specified activation height and active features.
+ */
+TxVersionInfo CurrentTxVersionInfo(const Consensus::Params& consensus, int nHeight) {
+    if (consensus.NetworkUpgradeActive(nHeight, Consensus::UPGRADE_ZFUTURE)) {
+        return {
+            .fOverwintered =   true,
+            .nVersionGroupId = ZFUTURE_VERSION_GROUP_ID,
+            .nVersion =        ZFUTURE_TX_VERSION
+        };
+    } else if (consensus.NetworkUpgradeActive(nHeight, Consensus::UPGRADE_SAPLING)) {
+        return {
+            .fOverwintered =   true,
+            .nVersionGroupId = SAPLING_VERSION_GROUP_ID,
+            .nVersion =        SAPLING_TX_VERSION
+        };
+    } else if (consensus.NetworkUpgradeActive(nHeight, Consensus::UPGRADE_OVERWINTER)) {
+        return {
+            .fOverwintered =   true,
+            .nVersionGroupId = OVERWINTER_VERSION_GROUP_ID,
+            .nVersion =        OVERWINTER_TX_VERSION
+        };
+    } else {
+        return {
+            .fOverwintered =   false,
+            .nVersionGroupId = 0,
+            .nVersion =        CTransaction::SPROUT_MIN_CURRENT_VERSION
+        };
+    }
 }

@@ -7,6 +7,7 @@
 #define BITCOIN_WALLET_DB_H
 
 #include "clientversion.h"
+#include "fs.h"
 #include "serialize.h"
 #include "streams.h"
 #include "sync.h"
@@ -16,21 +17,20 @@
 #include <string>
 #include <vector>
 
-#include <boost/filesystem/path.hpp>
+#include <boost/scope_exit.hpp>
 
 #include <db_cxx.h>
 
 static const unsigned int DEFAULT_WALLET_DBLOGSIZE = 100;
 static const bool DEFAULT_WALLET_PRIVDB = true;
-
-extern unsigned int nWalletDBUpdated;
+static const unsigned int DEFAULT_BDB_CACHE_SIZE = 16;
 
 class CDBEnv
 {
 private:
     bool fDbEnvInit;
     bool fMockDb;
-    // Don't change into boost::filesystem::path, as that can result in
+    // Don't change into fs::path, as that can result in
     // shutdown problems/crashes caused by a static initialized internal pointer.
     std::string strPath;
 
@@ -59,6 +59,11 @@ public:
                         RECOVER_OK,
                         RECOVER_FAIL };
     VerifyResult Verify(const std::string& strFile, bool (*recoverFunc)(CDBEnv& dbenv, const std::string& strFile));
+
+#ifdef YCASH_WR
+    bool Compact(const std::string& strFile);
+#endif // YCASH_WR
+
     /**
      * Salvage data from a file that Verify says is bad.
      * fAggressive sets the DB_AGGRESSIVE flag (see berkeley DB->verify() method documentation).
@@ -69,7 +74,7 @@ public:
     typedef std::pair<std::vector<unsigned char>, std::vector<unsigned char> > KeyValPair;
     bool Salvage(const std::string& strFile, bool fAggressive, std::vector<KeyValPair>& vResult);
 
-    bool Open(const boost::filesystem::path& path);
+    bool Open(const fs::path& path);
     void Close();
     void Flush(bool fShutdown);
     void CheckpointLSN(const std::string& strFile);
@@ -128,21 +133,22 @@ protected:
         Dbt datValue;
         datValue.set_flags(DB_DBT_MALLOC);
         int ret = pdb->get(activeTxn, &datKey, &datValue, 0);
-        memset(datKey.get_data(), 0, datKey.get_size());
-        if (datValue.get_data() == NULL)
-            return false;
+        memory_cleanse(datKey.get_data(), datKey.get_size());
+        if (datValue.get_data() != NULL) {
+            BOOST_SCOPE_EXIT_TPL(&datValue) {
+                // Clear and free memory
+                memory_cleanse(datValue.get_data(), datValue.get_size());
+                free(datValue.get_data());
+            } BOOST_SCOPE_EXIT_END
 
-        // Unserialize value
-        try {
-            CDataStream ssValue((char*)datValue.get_data(), (char*)datValue.get_data() + datValue.get_size(), SER_DISK, CLIENT_VERSION);
-            ssValue >> value;
-        } catch (const std::exception&) {
-            return false;
+            // Unserialize value
+            try {
+                CDataStream ssValue((char*)datValue.get_data(), (char*)datValue.get_data() + datValue.get_size(), SER_DISK, CLIENT_VERSION);
+                ssValue >> value;
+            } catch (const std::exception&) {
+                return false;
+            }
         }
-
-        // Clear and free memory
-        memset(datValue.get_data(), 0, datValue.get_size());
-        free(datValue.get_data());
         return (ret == 0);
     }
 
@@ -170,8 +176,8 @@ protected:
         int ret = pdb->put(activeTxn, &datKey, &datValue, (fOverwrite ? 0 : DB_NOOVERWRITE));
 
         // Clear memory in case it was a private key
-        memset(datKey.get_data(), 0, datKey.get_size());
-        memset(datValue.get_data(), 0, datValue.get_size());
+        memory_cleanse(datKey.get_data(), datKey.get_size());
+        memory_cleanse(datValue.get_data(), datValue.get_size());
         return (ret == 0);
     }
 
@@ -193,7 +199,7 @@ protected:
         int ret = pdb->del(activeTxn, &datKey, 0);
 
         // Clear memory
-        memset(datKey.get_data(), 0, datKey.get_size());
+        memory_cleanse(datKey.get_data(), datKey.get_size());
         return (ret == 0 || ret == DB_NOTFOUND);
     }
 
@@ -213,7 +219,7 @@ protected:
         int ret = pdb->exists(activeTxn, &datKey, 0);
 
         // Clear memory
-        memset(datKey.get_data(), 0, datKey.get_size());
+        memory_cleanse(datKey.get_data(), datKey.get_size());
         return (ret == 0);
     }
 
@@ -258,8 +264,8 @@ protected:
         ssValue.write((char*)datValue.get_data(), datValue.get_size());
 
         // Clear and free memory
-        memset(datKey.get_data(), 0, datKey.get_size());
-        memset(datValue.get_data(), 0, datValue.get_size());
+        memory_cleanse(datKey.get_data(), datKey.get_size());
+        memory_cleanse(datValue.get_data(), datValue.get_size());
         free(datKey.get_data());
         free(datValue.get_data());
         return 0;

@@ -19,13 +19,16 @@
  * for both bitcoind and bitcoin-core, to make it harder for attackers to
  * target servers or GUI users specifically.
  */
+#ifdef YCASH_WR
+const std::string CLIENT_NAME("YcashCpp-wr");
+#else
 const std::string CLIENT_NAME("YcashCpp");
+#endif // YCASH_WR
 
 /**
  * Client version number
  */
 #define CLIENT_VERSION_SUFFIX ""
-
 
 /**
  * The following part of the code determines the CLIENT_BUILD variable.
@@ -97,7 +100,12 @@ const std::string CLIENT_NAME("YcashCpp");
 #endif
 #endif
 
+#ifndef YCASH_WR
 const std::string CLIENT_BUILD(BUILD_DESC CLIENT_VERSION_SUFFIX);
+#else
+const std::string CLIENT_BUILD(BUILD_DESC DO_STRINGIZE(-wr));
+#endif // YCASH_WR
+
 const std::string CLIENT_DATE(BUILD_DATE);
 
 std::string FormatVersion(int nVersion)

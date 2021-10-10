@@ -43,13 +43,16 @@ int64_t GetTimeMicros()
 
 void MilliSleep(int64_t n)
 {
+    // This is defined to be an interruption point.
+    // <https://www.boost.org/doc/libs/1_70_0/doc/html/thread/thread_management.html#interruption_points>
     boost::this_thread::sleep_for(boost::chrono::milliseconds(n));
 }
 
 std::string DateTimeStrFormat(const char* pszFormat, int64_t nTime)
 {
+    static std::locale classic(std::locale::classic());
     // std::locale takes ownership of the pointer
-    std::locale loc(std::locale::classic(), new boost::posix_time::time_facet(pszFormat));
+    std::locale loc(classic, new boost::posix_time::time_facet(pszFormat));
     std::stringstream ss;
     ss.imbue(loc);
     ss << boost::posix_time::from_time_t(nTime);

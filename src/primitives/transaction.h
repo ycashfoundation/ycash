@@ -7,25 +7,26 @@
 #define BITCOIN_PRIMITIVES_TRANSACTION_H
 
 #include "amount.h"
-#include "random.h"
 #include "script/script.h"
 #include "serialize.h"
 #include "streams.h"
 #include "uint256.h"
 #include "consensus/consensus.h"
+#include "consensus/params.h"
+#include "consensus/upgrades.h"
 
 #include <array>
-
-#include <boost/variant.hpp>
+#include <variant>
 
 #include "zcash/NoteEncryption.hpp"
 #include "zcash/Zcash.h"
-#include "zcash/JoinSplit.hpp"
 #include "zcash/Proof.hpp"
 
-#define JOINSPLIT_SIZE GetSerializeSize(JSDescription(), SER_NETWORK, PROTOCOL_VERSION)
-#define OUTPUTDESCRIPTION_SIZE GetSerializeSize(OutputDescription(), SER_NETWORK, PROTOCOL_VERSION)
-#define SPENDDESCRIPTION_SIZE GetSerializeSize(SpendDescription(), SER_NETWORK, PROTOCOL_VERSION)
+#include <rust/ed25519/types.h>
+
+// Overwinter transaction version group id
+static constexpr uint32_t OVERWINTER_VERSION_GROUP_ID = 0x03C48270;
+static_assert(OVERWINTER_VERSION_GROUP_ID != 0, "version group id must be non-zero as specified in ZIP 202");
 
 // Overwinter transaction version
 static const int32_t OVERWINTER_TX_VERSION = 3;
@@ -34,12 +35,48 @@ static_assert(OVERWINTER_TX_VERSION >= OVERWINTER_MIN_TX_VERSION,
 static_assert(OVERWINTER_TX_VERSION <= OVERWINTER_MAX_TX_VERSION,
     "Overwinter tx version must not be higher than maximum");
 
+// Sapling transaction version group id
+static constexpr uint32_t SAPLING_VERSION_GROUP_ID = 0x892F2085;
+static_assert(SAPLING_VERSION_GROUP_ID != 0, "version group id must be non-zero as specified in ZIP 202");
+
 // Sapling transaction version
 static const int32_t SAPLING_TX_VERSION = 4;
 static_assert(SAPLING_TX_VERSION >= SAPLING_MIN_TX_VERSION,
     "Sapling tx version must not be lower than minimum");
 static_assert(SAPLING_TX_VERSION <= SAPLING_MAX_TX_VERSION,
     "Sapling tx version must not be higher than maximum");
+
+// Future transaction version group id
+static constexpr uint32_t ZFUTURE_VERSION_GROUP_ID = 0xFFFFFFFF;
+static_assert(ZFUTURE_VERSION_GROUP_ID != 0, "version group id must be non-zero as specified in ZIP 202");
+
+// Future transaction version. This value must only be used
+// in integration-testing contexts.
+static const int32_t ZFUTURE_TX_VERSION = 0x0000FFFF;
+
+struct TxVersionInfo {
+    bool fOverwintered;
+    uint32_t nVersionGroupId;
+    int32_t nVersion;
+};
+
+/**
+ * Returns the current transaction version and version group id,
+ * based upon the specified activation height and active features.
+ */
+TxVersionInfo CurrentTxVersionInfo(const Consensus::Params& consensus, int nHeight);
+
+struct TxParams {
+    unsigned int expiryDelta;
+};
+
+// These constants are defined in the protocol § 7.1:
+// https://zips.z.cash/protocol/protocol.pdf#txnencoding
+#define OUTPUTDESCRIPTION_SIZE 948
+#define SPENDDESCRIPTION_SIZE 384
+static inline size_t JOINSPLIT_SIZE(int transactionVersion) {
+    return transactionVersion >= SAPLING_TX_VERSION ? 1698 : 1802;
+}
 
 /**
  * A shielded input to a transaction. It contains data that describes a Spend transfer.
@@ -95,7 +132,7 @@ class OutputDescription
 {
 public:
     uint256 cv;                     //!< A value commitment to the value of the output note.
-    uint256 cm;                     //!< The note commitment for the output note.
+    uint256 cmu;                     //!< The u-coordinate of the note commitment for the output note.
     uint256 ephemeralKey;           //!< A Jubjub public key.
     libzcash::SaplingEncCiphertext encCiphertext; //!< A ciphertext component for the encrypted output note.
     libzcash::SaplingOutCiphertext outCiphertext; //!< A ciphertext component for the encrypted output note.
@@ -108,7 +145,7 @@ public:
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream& s, Operation ser_action) {
         READWRITE(cv);
-        READWRITE(cm);
+        READWRITE(cmu);
         READWRITE(ephemeralKey);
         READWRITE(encCiphertext);
         READWRITE(outCiphertext);
@@ -119,7 +156,7 @@ public:
     {
         return (
             a.cv == b.cv &&
-            a.cm == b.cm &&
+            a.cmu == b.cmu &&
             a.ephemeralKey == b.ephemeralKey &&
             a.encCiphertext == b.encCiphertext &&
             a.outCiphertext == b.outCiphertext &&
@@ -134,7 +171,7 @@ public:
 };
 
 template <typename Stream>
-class SproutProofSerializer : public boost::static_visitor<>
+class SproutProofSerializer
 {
     Stream& s;
     bool useGroth;
@@ -163,7 +200,7 @@ template<typename Stream, typename T>
 inline void SerReadWriteSproutProof(Stream& s, const T& proof, bool useGroth, CSerActionSerialize ser_action)
 {
     auto ps = SproutProofSerializer<Stream>(s, useGroth);
-    boost::apply_visitor(ps, proof);
+    std::visit(ps, proof);
 }
 
 template<typename Stream, typename T>
@@ -229,43 +266,6 @@ public:
     libzcash::SproutProof proof;
 
     JSDescription(): vpub_old(0), vpub_new(0) { }
-
-    JSDescription(
-            ZCJoinSplit& params,
-            const uint256& joinSplitPubKey,
-            const uint256& rt,
-            const std::array<libzcash::JSInput, ZC_NUM_JS_INPUTS>& inputs,
-            const std::array<libzcash::JSOutput, ZC_NUM_JS_OUTPUTS>& outputs,
-            CAmount vpub_old,
-            CAmount vpub_new,
-            bool computeProof = true, // Set to false in some tests
-            uint256 *esk = nullptr // payment disclosure
-    );
-
-    static JSDescription Randomized(
-            ZCJoinSplit& params,
-            const uint256& joinSplitPubKey,
-            const uint256& rt,
-            std::array<libzcash::JSInput, ZC_NUM_JS_INPUTS>& inputs,
-            std::array<libzcash::JSOutput, ZC_NUM_JS_OUTPUTS>& outputs,
-            std::array<size_t, ZC_NUM_JS_INPUTS>& inputMap,
-            std::array<size_t, ZC_NUM_JS_OUTPUTS>& outputMap,
-            CAmount vpub_old,
-            CAmount vpub_new,
-            bool computeProof = true, // Set to false in some tests
-            uint256 *esk = nullptr, // payment disclosure
-            std::function<int(int)> gen = GetRandInt
-    );
-
-    // Verifies that the JoinSplit proof is correct.
-    bool Verify(
-        ZCJoinSplit& params,
-        libzcash::ProofVerifier& verifier,
-        const uint256& joinSplitPubKey
-    ) const;
-
-    // Returns the calculated h_sig
-    uint256 h_sig(ZCJoinSplit& params, const uint256& joinSplitPubKey) const;
 
     ADD_SERIALIZE_METHODS;
 
@@ -362,9 +362,33 @@ class SaplingOutPoint : public BaseOutPoint
 {
 public:
     SaplingOutPoint() : BaseOutPoint() {};
-    SaplingOutPoint(uint256 hashIn, uint32_t nIn) : BaseOutPoint(hashIn, nIn) {}; 
+    SaplingOutPoint(uint256 hashIn, uint32_t nIn) : BaseOutPoint(hashIn, nIn) {};
     std::string ToString() const;
 };
+
+#ifdef YCASH_WR
+/** An block location point used to log the exact chain location of archived transactions */
+class ArchiveTxPoint
+{
+public:
+    uint256 hashBlock;
+    int nIndex;
+
+    ArchiveTxPoint() { SetNull(); }
+    ArchiveTxPoint(uint256 hashIn, int nIn) { hashBlock = hashIn; nIndex = nIn; }
+
+    ADD_SERIALIZE_METHODS;
+
+    template <typename Stream, typename Operation>
+    inline void SerializationOp(Stream& s, Operation ser_action) {
+        READWRITE(hashBlock);
+        READWRITE(nIndex);
+    }
+
+    void SetNull() { hashBlock.SetNull(); nIndex = -1; }
+    bool IsNull() const { return (hashBlock.IsNull() && nIndex == -1); }
+};
+#endif // YCASH_WR
 
 /** An input of a transaction.  It contains the location of the previous
  * transaction's output that it claims and a signature that matches the
@@ -375,6 +399,8 @@ class CTxIn
 public:
     COutPoint prevout;
     CScript scriptSig;
+    // The only use of nSequence (via IsFinal) is in TransactionSignatureChecker::CheckLockTime
+    // It disables the nLockTime feature when set to maxint.
     uint32_t nSequence;
 
     CTxIn()
@@ -409,6 +435,10 @@ public:
     friend bool operator!=(const CTxIn& a, const CTxIn& b)
     {
         return !(a == b);
+    }
+
+    const COutPoint& GetOutPoint() const {
+        return prevout;
     }
 
     std::string ToString() const;
@@ -487,14 +517,6 @@ public:
     std::string ToString() const;
 };
 
-// Overwinter version group id
-static constexpr uint32_t OVERWINTER_VERSION_GROUP_ID = 0x03C48270;
-static_assert(OVERWINTER_VERSION_GROUP_ID != 0, "version group id must be non-zero as specified in ZIP 202");
-
-// Sapling version group id
-static constexpr uint32_t SAPLING_VERSION_GROUP_ID = 0x892F2085;
-static_assert(SAPLING_VERSION_GROUP_ID != 0, "version group id must be non-zero as specified in ZIP 202");
-
 struct CMutableTransaction;
 
 /** The basic transaction that is broadcasted on the network and contained in
@@ -558,8 +580,8 @@ public:
     const std::vector<SpendDescription> vShieldedSpend;
     const std::vector<OutputDescription> vShieldedOutput;
     const std::vector<JSDescription> vJoinSplit;
-    const uint256 joinSplitPubKey;
-    const joinsplit_sig_t joinSplitSig = {{0}};
+    const Ed25519VerificationKey joinSplitPubKey;
+    const Ed25519Signature joinSplitSig;
     const binding_sig_t bindingSig = {{0}};
 
     /** Construct a CTransaction that qualifies as IsNull() */
@@ -593,34 +615,47 @@ public:
             fOverwintered &&
             nVersionGroupId == OVERWINTER_VERSION_GROUP_ID &&
             nVersion == OVERWINTER_TX_VERSION;
+
         bool isSaplingV4 =
             fOverwintered &&
             nVersionGroupId == SAPLING_VERSION_GROUP_ID &&
             nVersion == SAPLING_TX_VERSION;
-        if (fOverwintered && !(isOverwinterV3 || isSaplingV4)) {
+
+        // It is not possible to make the transaction's serialized form vary on
+        // a per-enabled-feature basis. The approach here is that all
+        // serialization rules for not-yet-released features must be
+        // non-conflicting and transaction version/group must be set to
+        // ZFUTURE_TX_(VERSION/GROUP_ID)
+        bool isFuture =
+            fOverwintered &&
+            nVersionGroupId == ZFUTURE_VERSION_GROUP_ID &&
+            nVersion == ZFUTURE_TX_VERSION;
+
+        if (fOverwintered && !(isOverwinterV3 || isSaplingV4 || isFuture)) {
             throw std::ios_base::failure("Unknown transaction format");
         }
 
         READWRITE(*const_cast<std::vector<CTxIn>*>(&vin));
         READWRITE(*const_cast<std::vector<CTxOut>*>(&vout));
         READWRITE(*const_cast<uint32_t*>(&nLockTime));
-        if (isOverwinterV3 || isSaplingV4) {
+        if (isOverwinterV3 || isSaplingV4 || isFuture) {
             READWRITE(*const_cast<uint32_t*>(&nExpiryHeight));
         }
-        if (isSaplingV4) {
+        if (isSaplingV4 || isFuture) {
             READWRITE(*const_cast<CAmount*>(&valueBalance));
             READWRITE(*const_cast<std::vector<SpendDescription>*>(&vShieldedSpend));
             READWRITE(*const_cast<std::vector<OutputDescription>*>(&vShieldedOutput));
         }
         if (nVersion >= 2) {
+            // These fields do not depend on fOverwintered
             auto os = WithVersion(&s, static_cast<int>(header));
             ::SerReadWrite(os, *const_cast<std::vector<JSDescription>*>(&vJoinSplit), ser_action);
             if (vJoinSplit.size() > 0) {
-                READWRITE(*const_cast<uint256*>(&joinSplitPubKey));
-                READWRITE(*const_cast<joinsplit_sig_t*>(&joinSplitSig));
+                READWRITE(*const_cast<Ed25519VerificationKey*>(&joinSplitPubKey));
+                READWRITE(*const_cast<Ed25519Signature*>(&joinSplitSig));
             }
         }
-        if (isSaplingV4 && !(vShieldedSpend.empty() && vShieldedOutput.empty())) {
+        if ((isSaplingV4 || isFuture) && !(vShieldedSpend.empty() && vShieldedOutput.empty())) {
             READWRITE(*const_cast<binding_sig_t*>(&bindingSig));
         }
         if (ser_action.ForRead())
@@ -705,8 +740,8 @@ struct CMutableTransaction
     std::vector<SpendDescription> vShieldedSpend;
     std::vector<OutputDescription> vShieldedOutput;
     std::vector<JSDescription> vJoinSplit;
-    uint256 joinSplitPubKey;
-    CTransaction::joinsplit_sig_t joinSplitSig = {{0}};
+    Ed25519VerificationKey joinSplitPubKey;
+    Ed25519Signature joinSplitSig;
     CTransaction::binding_sig_t bindingSig = {{0}};
 
     CMutableTransaction();
@@ -743,17 +778,21 @@ struct CMutableTransaction
             fOverwintered &&
             nVersionGroupId == SAPLING_VERSION_GROUP_ID &&
             nVersion == SAPLING_TX_VERSION;
-        if (fOverwintered && !(isOverwinterV3 || isSaplingV4)) {
+        bool isFuture =
+            fOverwintered &&
+            nVersionGroupId == ZFUTURE_VERSION_GROUP_ID &&
+            nVersion == ZFUTURE_TX_VERSION;
+        if (fOverwintered && !(isOverwinterV3 || isSaplingV4 || isFuture)) {
             throw std::ios_base::failure("Unknown transaction format");
         }
 
         READWRITE(vin);
         READWRITE(vout);
         READWRITE(nLockTime);
-        if (isOverwinterV3 || isSaplingV4) {
+        if (isOverwinterV3 || isSaplingV4 || isFuture) {
             READWRITE(nExpiryHeight);
         }
-        if (isSaplingV4) {
+        if (isSaplingV4 || isFuture) {
             READWRITE(valueBalance);
             READWRITE(vShieldedSpend);
             READWRITE(vShieldedOutput);
@@ -766,7 +805,7 @@ struct CMutableTransaction
                 READWRITE(joinSplitSig);
             }
         }
-        if (isSaplingV4 && !(vShieldedSpend.empty() && vShieldedOutput.empty())) {
+        if ((isSaplingV4 || isFuture) && !(vShieldedSpend.empty() && vShieldedOutput.empty())) {
             READWRITE(bindingSig);
         }
     }
