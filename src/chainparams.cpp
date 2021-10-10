@@ -188,7 +188,7 @@ public:
         keyConstants.bech32HRPs[LEGACY_SAPLING_EXTENDED_FVK]         = "zxviews";
 
         // The best chain should have at least this much work.
-        consensus.nMinimumChainWork = uint256S("0000000000000000000000000000000000000000000000000152d5e148328b7a");
+        consensus.nMinimumChainWork = uint256S("0000000000000000000000000000000000000000000000000152d608a8c7cab7");
 
         /**
          * The message start string should be awesome! ⓩ❤
@@ -238,10 +238,11 @@ public:
             (497000, uint256S("0x0000000000abd333f0acca6ffdf78a167699686d6a7d25c33fca5f295061ffff"))
             (525000, uint256S("0x0000000001a36c500378be8862d9bf1bea8f1616da6e155971b608139cc7e39b"))
             (572760, uint256S("0x00000008db657f58222e38e354c18ccbb6c74cf525ef4f3a95f0f8a324a3166d"))
-            (980000, uint256S("0x00000510ccc6bae2ddb38b9313ffb9686397f6cd0dee243462baeaf8911d0791")),
-            1625391473,     // * UNIX timestamp of last checkpoint block
-            6029903,        // * total number of transactions between genesis and last checkpoint
-            3550            // * estimated number of transactions per day after checkpoint
+            (980000, uint256S("0x00000510ccc6bae2ddb38b9313ffb9686397f6cd0dee243462baeaf8911d0791"))
+            (1035353, uint256S("0x00000543378a75f173914390c672838c9fbd9dc86ae647ffae18ed6b626edb30")),
+            1633786161,     // * UNIX timestamp of last checkpoint block
+            6114050,        // * total number of transactions between genesis and last checkpoint
+            3400            // * estimated number of transactions per day after checkpoint
                             //   total number of tx / (checkpoint block height / (24 * 24))
         };
 
@@ -447,7 +448,7 @@ public:
         consensus.nFutureTimestampSoftForkHeight = consensus.vUpgrades[Consensus::UPGRADE_BLOSSOM].nActivationHeight;
 
         // The best chain should have at least this much work.
-        consensus.nMinimumChainWork = uint256S("0x0000000000000000000000000000000000000000000000000000001958c35a99");
+        consensus.nMinimumChainWork = uint256S("0x0000000000000000000000000000000000000000000000000000001959b78e6f");
 
         pchMessageStart[0] = 0xfa;
         pchMessageStart[1] = 0x1a;
@@ -482,10 +483,11 @@ public:
         checkpointData = (CCheckpointData) {
             boost::assign::map_list_of
             (0, consensus.hashGenesisBlock)
-            (38000, uint256S("0x001e9a2d2e2892b88e9998cf7b079b41d59dd085423a921fe8386cecc42287b8")),
-            1486897419,  // * UNIX timestamp of last checkpoint block
-            47163,       // * total number of transactions between genesis and last checkpoint
-            715          //   total number of tx / (checkpoint block height / (24 * 24))
+            (38000, uint256S("0x001e9a2d2e2892b88e9998cf7b079b41d59dd085423a921fe8386cecc42287b8"))
+            (650000, uint256S("0x005dd2092f75382581468e870b51233a8950bf9c396689c513e5a80f00c14609")),
+            1633853210,  // * UNIX timestamp of last checkpoint block
+            862651,       // * total number of transactions between genesis and last checkpoint
+            765          //   total number of tx / (checkpoint block height / (24 * 24))
         };
 
         // Hardcoded fallback value for the Sprout shielded value pool balance
