@@ -456,7 +456,7 @@ dependencies = [
 [[package]]
 name = "equihash"
 version = "0.1.0"
-source = "git+https://github.com/ycashfoundation/librustzcash.git?rev=82aec231340bd9ff18d804614d41712696c5ff2a#82aec231340bd9ff18d804614d41712696c5ff2a"
+source = "git+https://github.com/ycashfoundation/librustzcash.git?rev=7e17b36ba428d3f9230a4313c0f037de673cec15#7e17b36ba428d3f9230a4313c0f037de673cec15"
 dependencies = [
  "blake2b_simd",
  "byteorder",
@@ -1500,7 +1500,7 @@ dependencies = [
 [[package]]
 name = "zcash_primitives"
 version = "0.5.0"
-source = "git+https://github.com/ycashfoundation/librustzcash.git?rev=82aec231340bd9ff18d804614d41712696c5ff2a#82aec231340bd9ff18d804614d41712696c5ff2a"
+source = "git+https://github.com/ycashfoundation/librustzcash.git?rev=7e17b36ba428d3f9230a4313c0f037de673cec15#7e17b36ba428d3f9230a4313c0f037de673cec15"
 dependencies = [
  "aes",
  "bitvec",
