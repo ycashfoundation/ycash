@@ -59,4 +59,4 @@ panic = 'abort'
 codegen-units = 1
 
 [patch.crates-io]
-zcash_primitives = { git = "https://github.com/ycashfoundation/librustzcash.git", rev = "cb736f579639e9f3cec8665c7b9d560cd7dd0fd8" }
+zcash_primitives = { git = "https://github.com/ycashfoundation/librustzcash.git", rev = "46c502be534cd2b5d841ab988c9e7a127166c453" }
