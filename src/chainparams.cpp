@@ -128,11 +128,11 @@ public:
         consensus.vUpgrades[Consensus::UPGRADE_YCASH].hashActivationBlock =
             uint256S("0000014fbc5917ba8bcacf3336faf588d86b32443aa3a490a587af5750c77ec5");
         consensus.vUpgrades[Consensus::UPGRADE_BLOSSOM].nProtocolVersion = 270009;
-        consensus.vUpgrades[Consensus::UPGRADE_BLOSSOM].nActivationHeight = 1081490;
+        consensus.vUpgrades[Consensus::UPGRADE_BLOSSOM].nActivationHeight = 1081500;
         consensus.vUpgrades[Consensus::UPGRADE_HEARTWOOD].nProtocolVersion = 270011;
-        consensus.vUpgrades[Consensus::UPGRADE_HEARTWOOD].nActivationHeight = 1081493;
+        consensus.vUpgrades[Consensus::UPGRADE_HEARTWOOD].nActivationHeight = 1081503;
         consensus.vUpgrades[Consensus::UPGRADE_CANOPY].nProtocolVersion = 270013;
-        consensus.vUpgrades[Consensus::UPGRADE_CANOPY].nActivationHeight = 1081496;
+        consensus.vUpgrades[Consensus::UPGRADE_CANOPY].nActivationHeight = 1081506;
         consensus.vUpgrades[Consensus::UPGRADE_NU5].nProtocolVersion = 270015;
         consensus.vUpgrades[Consensus::UPGRADE_NU5].nActivationHeight =
             Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
