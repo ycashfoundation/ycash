@@ -31,8 +31,8 @@ const struct NUInfo NetworkUpgradeInfo[Consensus::MAX_NETWORK_UPGRADES] = {
     },
     {
         .nBranchId = 0x374d694f,
-        .strName = "YCash",
-        .strInfo = "See YCash for details.",
+        .strName = "Ycash",
+        .strInfo = "See Ycash for details.",
     },
     {
         .nBranchId = 0x8e471bd6,
