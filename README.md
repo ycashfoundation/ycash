@@ -1,4 +1,4 @@
-# Ycash v4.4.1
+# Ycash v4.4.2
 
 ## Getting Started
 
