@@ -1501,7 +1501,10 @@ void CWallet::IncrementNoteWitnesses(const CBlockIndex* pindex,
     const CBlock* pblock {pblockIn};
     CBlock block;
     if (!pblock) {
-        ReadBlockFromDisk(block, pindex, consensus);
+        if (!ReadBlockFromDisk(block, pindex, consensus)) {
+            throw std::runtime_error(
+                strprintf("Can't read block %d from disk (%s)", pindex->nHeight, pindex->GetBlockHash().GetHex()));
+        }
         pblock = &block;
     }
 
@@ -3628,7 +3631,12 @@ void CWallet::WitnessNoteCommitment(std::vector<uint256> commitments,
 
     while (pindex) {
         CBlock block;
-        ReadBlockFromDisk(block, pindex, Params().GetConsensus());
+        if (!ReadBlockFromDisk(block, pindex, Params().GetConsensus())) {
+            // CWallet::WitnessNoteCommitment is only called from the deprecated RPC
+            // methods `zc_raw_receive` and `zc_raw_joinsplit`.
+            throw std::runtime_error(
+                strprintf("Can't read block %d from disk (%s)", pindex->nHeight, pindex->GetBlockHash().GetHex()));
+        }
 
         for (const CTransaction& tx : block.vtx)
         {
@@ -4219,14 +4227,21 @@ int CWallet::ScanForWalletTransactions(CBlockIndex* pindexStart, bool fUpdate)
 
             CBlock block;
             bool blockInvolvesMe = false;
+            bool fBlockReadResult;
 
             if (fBlockPrefetchEnabled)
             {
-                ReadBlockFromPrefetch(block, pindex, consensus_params);
+                fBlockReadResult = ReadBlockFromPrefetch(block, pindex, consensus_params);
             }
             else
             {
-                ReadBlockFromDisk(block, pindex, consensus_params);
+                fBlockReadResult = ReadBlockFromDisk(block, pindex, consensus_params);
+            }
+
+            if (!fBlockReadResult)
+            {
+                throw std::runtime_error(
+                    strprintf("Can't read block %d from disk (%s)", pindex->nHeight, pindex->GetBlockHash().GetHex()));
             }
 
             for (const CTransaction& tx : block.vtx)
