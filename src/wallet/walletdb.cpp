@@ -59,23 +59,11 @@ bool CWalletDB::ErasePurpose(const string& strPurpose)
 }
 
 #ifdef YCASH_WR
-//Begin Historical Wallet Tx
-bool CWalletDB::WriteArcTx(uint256 hash, ArchiveTxPoint arcTxPoint)
-{
-    nWalletDBUpdateCounter++;
-    return Write(std::make_pair(std::string("arctx"), hash), arcTxPoint);
-}
-
+/** Left just for zapping */
 bool CWalletDB::EraseArcTx(uint256 hash)
 {
     nWalletDBUpdateCounter++;
     return Erase(std::make_pair(std::string("arctx"), hash));
-}
-
-bool CWalletDB::WriteArcSproutOp(uint256 nullifier, JSOutPoint op)
-{
-    nWalletDBUpdateCounter++;
-    return Write(std::make_pair(std::string("arczcop"), nullifier), op);
 }
 
 bool CWalletDB::EraseArcSproutOp(uint256 nullifier)
@@ -84,18 +72,11 @@ bool CWalletDB::EraseArcSproutOp(uint256 nullifier)
     return Erase(std::make_pair(std::string("arczcop"), nullifier));
 }
 
-bool CWalletDB::WriteArcSaplingOp(uint256 nullifier, SaplingOutPoint op)
-{
-    nWalletDBUpdateCounter++;
-    return Write(std::make_pair(std::string("arczsop"), nullifier), op);
-}
-
 bool CWalletDB::EraseArcSaplingOp(uint256 nullifier)
 {
     nWalletDBUpdateCounter++;
     return Erase(std::make_pair(std::string("arczsop"), nullifier));
 }
-//End Historical Wallet Tx
 #endif // YCASH_WR
 
 bool CWalletDB::WriteTx(uint256 hash, const CWalletTx& wtx)
@@ -555,35 +536,6 @@ ReadKeyValue(CWallet* pwallet, CDataStream& ssKey, CDataStream& ssValue,
 
             pwallet->AddToWallet(wtx, true, NULL);
         }
-#ifdef YCASH_WR
-        else if (strType == "arctx")
-        {
-            uint256 wtxid;
-            ssKey >> wtxid;
-            ArchiveTxPoint ArcTxPt;
-            ssValue >> ArcTxPt;
-
-            pwallet->AddToArcTxs(wtxid, ArcTxPt);
-        }
-        else if (strType == "arczcop")
-        {
-            uint256 nullifier;
-            ssKey >> nullifier;
-            JSOutPoint op;
-            ssValue >> op;
-
-            pwallet->AddToArcJSOutPoints(nullifier, op);
-        }
-        else if (strType == "arczsop")
-        {
-            uint256 nullifier;
-            ssKey >> nullifier;
-            SaplingOutPoint op;
-            ssValue >> op;
-
-            pwallet->AddToArcSaplingOutPoints(nullifier, op);
-        }
-#endif // YCASH_WR
         else if (strType == "acentry")
         {
             string strAccount;

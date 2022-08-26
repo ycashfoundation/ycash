@@ -136,14 +136,10 @@ public:
     bool ErasePurpose(const std::string& strAddress);
 
 #ifdef YCASH_WR
-    //Begin Historical Wallet Tx
-    bool WriteArcTx(uint256 hash, ArchiveTxPoint arcTxPoint);
+    /** Left just for zapping */
     bool EraseArcTx(uint256 hash);
-    bool WriteArcSproutOp(uint256 nullifier, JSOutPoint op);
     bool EraseArcSproutOp(uint256 nullifier);
-    bool WriteArcSaplingOp(uint256 nullifier, SaplingOutPoint op);
     bool EraseArcSaplingOp(uint256 nullifier);
-    //End Historical Wallet Tx
 #endif // YCASH_WR
 
     bool WriteTx(uint256 hash, const CWalletTx& wtx);

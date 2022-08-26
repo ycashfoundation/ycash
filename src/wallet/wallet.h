@@ -677,10 +677,6 @@ public:
     bool IsTrusted() const;
 
     bool WriteToDisk(CWalletDB *pwalletdb);
-#ifdef YCASH_WR    
-    bool WriteArcSproutOpToDisk(CWalletDB *pwalletdb, uint256 nullifier, JSOutPoint op);
-    bool WriteArcSaplingOpToDisk(CWalletDB *pwalletdb, uint256 nullifier, SaplingOutPoint op);
-#endif // YCASH_WR
 
     int64_t GetTxTime() const;
     int GetRequestCount() const;
@@ -906,15 +902,6 @@ public:
 #ifdef YCASH_WR
     int64_t NullifierCount();
     std::set<uint256> GetNullifiers();
-
-    std::map<uint256, ArchiveTxPoint> mapArcTxs;
-    void AddToArcTxs(const uint256& wtxid, const ArchiveTxPoint& ArcTxPt);
-
-    std::map<uint256, JSOutPoint> mapArcJSOutPoints;
-    void AddToArcJSOutPoints(const uint256& nullifier, const JSOutPoint& op);
-
-    std::map<uint256, SaplingOutPoint> mapArcSaplingOutPoints;
-    void AddToArcSaplingOutPoints(const uint256& nullifier, const SaplingOutPoint& op);
 #endif // YCASH_WR
 
 protected:
@@ -1327,7 +1314,6 @@ public:
     void UpdateWalletTransactionOrder(std::map<std::pair<int,int>, const uint256> &mapSorted, bool resetOrder);
     unsigned int DeleteTransactions(std::vector<uint256> &removeTxs, std::vector<uint256> &removeExpiredTxs);
     void DeleteWalletTransactions(const CBlockIndex* pindex);
-    bool initalizeArcTx();
 #endif // YCASH_WR
     int ScanForWalletTransactions(CBlockIndex* pindexStart, bool fUpdate = false);
     void ReacceptWalletTransactions();
