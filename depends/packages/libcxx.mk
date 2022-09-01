@@ -1,5 +1,6 @@
 package=libcxx
 $(package)_version=$(native_clang_version)
+$(package)_msys2_version=14.0.6-1
 
 ifneq ($(canonical_host),$(build))
 ifneq ($(host_os),mingw32)
@@ -8,27 +9,31 @@ ifneq ($(host_os),mingw32)
 $(package)_download_path=$(native_clang_download_path)
 $(package)_download_file_aarch64_linux=clang+llvm-$($(package)_version)-aarch64-linux-gnu.tar.xz
 $(package)_file_name_aarch64_linux=clang-llvm-$($(package)_version)-aarch64-linux-gnu.tar.xz
-$(package)_sha256_hash_aarch64_linux=3d4ad804b7c85007686548cbc917ab067bf17eaedeab43d9eb83d3a683d8e9d4
-$(package)_download_file_linux=clang+llvm-$($(package)_version)-x86_64-linux-gnu-ubuntu-16.04.tar.xz
-$(package)_file_name_linux=clang-llvm-$($(package)_version)-x86_64-linux-gnu-ubuntu-16.04.tar.xz
-$(package)_sha256_hash_linux=6b3cc55d3ef413be79785c4dc02828ab3bd6b887872b143e3091692fc6acefe7
+$(package)_sha256_hash_aarch64_linux=1a81fda984f5e607584916fdf69cf41e5385b219b983544d2c1a14950d5a65cf
+$(package)_download_file_linux=clang+llvm-$($(package)_version)-x86_64-linux-gnu-ubuntu-18.04.tar.xz
+$(package)_file_name_linux=clang-llvm-$($(package)_version)-x86_64-linux-gnu-ubuntu-18.04.tar.xz
+$(package)_sha256_hash_linux=61582215dafafb7b576ea30cc136be92c877ba1f1c31ddbbd372d6d65622fef5
 
+# Starting from LLVM 14.0.0, some Clang binary tarballs store libc++ in a
+# target-specific subdirectory.
 define $(package)_stage_cmds
   mkdir -p $($(package)_staging_prefix_dir)/lib && \
-  cp lib/libc++.a $($(package)_staging_prefix_dir)/lib && \
-  cp lib/libc++abi.a $($(package)_staging_prefix_dir)/lib
+  (test ! -f lib/*/libc++.a    || cp lib/*/libc++.a    $($(package)_staging_prefix_dir)/lib) && \
+  (test ! -f lib/*/libc++abi.a || cp lib/*/libc++abi.a $($(package)_staging_prefix_dir)/lib) && \
+  (test ! -f lib/libc++.a      || cp lib/libc++.a      $($(package)_staging_prefix_dir)/lib) && \
+  (test ! -f lib/libc++abi.a   || cp lib/libc++abi.a   $($(package)_staging_prefix_dir)/lib)
 endef
 
 else
 # For Windows cross-compilation, use the MSYS2 binaries.
 $(package)_download_path=https://repo.msys2.org/mingw/x86_64
-$(package)_download_file=mingw-w64-x86_64-libc++-12.0.1-1-any.pkg.tar.zst
-$(package)_file_name=mingw-w64-x86_64-libcxx-12.0.1-1-any.pkg.tar.zst
-$(package)_sha256_hash=847d86435c35f12b4bc779c91c800a86499ba5c9d419d6ed5e2386c7582c2e81
+$(package)_download_file=mingw-w64-x86_64-libc++-$($(package)_msys2_version)-any.pkg.tar.zst
+$(package)_file_name=mingw-w64-x86_64-libcxx-$($(package)_msys2_version)-any.pkg.tar.zst
+$(package)_sha256_hash=05f888ec1d82cb989a22ced6b85834c5d9aac46613b15334e6a2806c3d0960a4
 
-$(package)_libcxxabi_download_file=mingw-w64-x86_64-libc++abi-12.0.1-1-any.pkg.tar.zst
-$(package)_libcxxabi_file_name=mingw-w64-x86_64-libcxxabi-12.0.1-1-any.pkg.tar.zst
-$(package)_libcxxabi_sha256_hash=a60294cb611916f4b9db27b7a6f3d6dc0f75d9006ad6a5bb830427df9b5bc9d2
+$(package)_libcxxabi_download_file=mingw-w64-x86_64-libc++abi-$($(package)_msys2_version)-any.pkg.tar.zst
+$(package)_libcxxabi_file_name=mingw-w64-x86_64-libcxxabi-$($(package)_msys2_version)-any.pkg.tar.zst
+$(package)_libcxxabi_sha256_hash=0ca22d18cb155f6d230d7f6691c05b876316e0c381195428f063f66352689ca4
 
 $(package)_extra_sources += $($(package)_libcxxabi_file_name)
 
@@ -67,8 +72,10 @@ endef
 
 define $(package)_stage_cmds
   mkdir -p $($(package)_staging_prefix_dir)/lib && \
-  cp $(build_prefix)/lib/libc++.a $($(package)_staging_prefix_dir)/lib && \
-  if [ -f "$(build_prefix)/lib/libc++abi.a" ]; then cp $(build_prefix)/lib/libc++abi.a $($(package)_staging_prefix_dir)/lib; fi
+  (test ! -f $(build_prefix)/lib/*/libc++.a    || cp $(build_prefix)/lib/*/libc++.a    $($(package)_staging_prefix_dir)/lib) && \
+  (test ! -f $(build_prefix)/lib/*/libc++abi.a || cp $(build_prefix)/lib/*/libc++abi.a $($(package)_staging_prefix_dir)/lib) && \
+  (test ! -f $(build_prefix)/lib/libc++.a      || cp $(build_prefix)/lib/libc++.a      $($(package)_staging_prefix_dir)/lib) && \
+  (test ! -f $(build_prefix)/lib/libc++abi.a   || cp $(build_prefix)/lib/libc++abi.a   $($(package)_staging_prefix_dir)/lib)
 endef
 
 endif
