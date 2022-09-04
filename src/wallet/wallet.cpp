@@ -1328,6 +1328,17 @@ void CWallet::AddToSpends(const uint256& wtxid)
     }
 }
 
+void CWallet::AddToSifted(const uint256& wtxid)
+{
+    CWalletTx& wtx = mapWallet.at(wtxid);
+
+    if (!wtx.mapSproutNoteData.empty())
+        setSiftedSprout.emplace(wtxid);
+
+    if (!wtx.mapSaplingNoteData.empty())
+        setSiftedSapling.emplace(wtxid);
+}
+
 void CWallet::ClearNoteWitnessCache()
 {
     LOCK(cs_wallet);
@@ -1437,9 +1448,15 @@ void CWallet::IncrementNoteWitnesses(const CBlockIndex* pindex,
                                      SaplingMerkleTree& saplingTree)
 {
     LOCK(cs_wallet);
-    for (std::pair<const uint256, CWalletTx>& wtxItem : mapWallet) {
-       ::CopyPreviousWitnesses(wtxItem.second.mapSproutNoteData, pindex->nHeight, nWitnessCacheSize);
-       ::CopyPreviousWitnesses(wtxItem.second.mapSaplingNoteData, pindex->nHeight, nWitnessCacheSize);
+
+    for (const uint256& wtxid : setSiftedSprout)
+    {
+        ::CopyPreviousWitnesses(mapWallet.at(wtxid).mapSproutNoteData, pindex->nHeight, nWitnessCacheSize);
+    }
+
+    for (const uint256& wtxid : setSiftedSapling)
+    {
+        ::CopyPreviousWitnesses(mapWallet.at(wtxid).mapSaplingNoteData, pindex->nHeight, nWitnessCacheSize);
     }
 
     if (nWitnessCacheSize < WITNESS_CACHE_SIZE) {
@@ -1463,9 +1480,9 @@ void CWallet::IncrementNoteWitnesses(const CBlockIndex* pindex,
                 const uint256& note_commitment = jsdesc.commitments[j];
                 sproutTree.append(note_commitment);
 
-                // Increment existing witnesses
-                for (std::pair<const uint256, CWalletTx>& wtxItem : mapWallet) {
-                    ::AppendNoteCommitment(wtxItem.second.mapSproutNoteData, pindex->nHeight, nWitnessCacheSize, note_commitment);
+                for (const uint256& wtxid : setSiftedSprout)
+                {
+                    ::AppendNoteCommitment(mapWallet.at(wtxid).mapSproutNoteData, pindex->nHeight, nWitnessCacheSize, note_commitment);
                 }
 
                 // If this is our note, witness it
@@ -1480,9 +1497,9 @@ void CWallet::IncrementNoteWitnesses(const CBlockIndex* pindex,
             const uint256& note_commitment = tx.vShieldedOutput[i].cmu;
             saplingTree.append(note_commitment);
 
-            // Increment existing witnesses
-            for (std::pair<const uint256, CWalletTx>& wtxItem : mapWallet) {
-                ::AppendNoteCommitment(wtxItem.second.mapSaplingNoteData, pindex->nHeight, nWitnessCacheSize, note_commitment);
+            for (const uint256& wtxid : setSiftedSapling)
+            {
+                ::AppendNoteCommitment(mapWallet.at(wtxid).mapSaplingNoteData, pindex->nHeight, nWitnessCacheSize, note_commitment);
             }
 
             // If this is our note, witness it
@@ -1493,10 +1510,14 @@ void CWallet::IncrementNoteWitnesses(const CBlockIndex* pindex,
         }
     }
 
-    // Update witness heights
-    for (std::pair<const uint256, CWalletTx>& wtxItem : mapWallet) {
-        ::UpdateWitnessHeights(wtxItem.second.mapSproutNoteData, pindex->nHeight, nWitnessCacheSize);
-        ::UpdateWitnessHeights(wtxItem.second.mapSaplingNoteData, pindex->nHeight, nWitnessCacheSize);
+    for (const uint256& wtxid : setSiftedSprout)
+    {
+        ::UpdateWitnessHeights(mapWallet.at(wtxid).mapSproutNoteData, pindex->nHeight, nWitnessCacheSize);
+    }
+
+    for (const uint256& wtxid : setSiftedSapling)
+    {
+        ::UpdateWitnessHeights(mapWallet.at(wtxid).mapSaplingNoteData, pindex->nHeight, nWitnessCacheSize);
     }
 
     // For performance reasons, we write out the witness cache in
@@ -2357,6 +2378,7 @@ bool CWallet::AddToWallet(const CWalletTx& wtxIn, bool fFromLoadWallet, CWalletD
         mapWallet[hash].BindWallet(this);
         UpdateNullifierNoteMapWithTx(mapWallet[hash]);
         AddToSpends(hash);
+        AddToSifted(hash);
     }
     else
     {
@@ -2418,6 +2440,7 @@ bool CWallet::AddToWallet(const CWalletTx& wtxIn, bool fFromLoadWallet, CWalletD
                              wtxIn.hashBlock.ToString());
             }
             AddToSpends(hash);
+            AddToSifted(hash);
         }
 
         bool fUpdated = false;
