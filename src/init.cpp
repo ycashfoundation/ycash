@@ -389,6 +389,9 @@ std::string HelpMessage(HelpMessageMode mode)
     strUsage += HelpMessageOpt("-prune=<n>", strprintf(_("Reduce storage requirements by pruning (deleting) old blocks. This mode disables wallet support and is incompatible with -txindex. "
             "Warning: Reverting this setting requires re-downloading the entire blockchain. "
             "(default: 0 = disable pruning blocks, >%u = target size in MiB to use for block files)"), MIN_DISK_SPACE_FOR_BLOCK_FILES / 1024 / 1024));
+    strUsage += HelpMessageOpt("-blockprefetch", strprintf(_("Use block prefetch to speed up sequential block reading (default: %u)"), DEFAULT_BLOCK_PREFETCH_ENABLED));
+    strUsage += HelpMessageOpt("-prefetchnumthreads=<n>", strprintf(_("How many threads to use for parallel block prefetching (default: %u)"), DEFAULT_PREFETCH_NUM_THREADS));
+    strUsage += HelpMessageOpt("-prefetchnumblocks=<n>", strprintf(_("How many blocks to keep in prefetch cache (default: %u)"), DEFAULT_PREFETCH_NUM_BLOCKS));
     strUsage += HelpMessageOpt("-reindex", _("Rebuild block chain index from current blk000??.dat files on startup"));
 #ifndef WIN32
     strUsage += HelpMessageOpt("-sysperms", _("Create new files with system default permissions, instead of umask 077 (only effective with disabled wallet functionality)"));
@@ -1084,6 +1087,17 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
         }
         LogPrintf("Prune configured to target %uMiB on disk for block and undo files.\n", nPruneTarget / 1024 / 1024);
         fPruneMode = true;
+    }
+
+    // block prefetch cache
+    fBlockPrefetchEnabled = GetBoolArg("-blockprefetch", DEFAULT_BLOCK_PREFETCH_ENABLED);
+    nPrefetchNumThreads = GetArg("-prefetchnumthreads", DEFAULT_PREFETCH_NUM_THREADS);
+    nPrefetchNumBlocks = GetArg("-prefetchnumblocks", DEFAULT_PREFETCH_NUM_BLOCKS);
+
+    LogPrintf("Block prefetch cache is %s.\n", fBlockPrefetchEnabled ? "enabled" : "disabled");
+    if (fBlockPrefetchEnabled)
+    {
+        LogPrintf("number of prefetch threads = %i , number of prefetch blocks = %i\n", nPrefetchNumThreads, nPrefetchNumBlocks);
     }
 
     RegisterAllCoreRPCCommands(tableRPC);

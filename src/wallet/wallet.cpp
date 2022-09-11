@@ -4109,7 +4109,16 @@ int CWallet::ScanForWalletTransactions(CBlockIndex* pindexStart, bool fUpdate)
 
             CBlock block;
             bool blockInvolvesMe = false;
-            ReadBlockFromDisk(block, pindex, consensus_params);
+
+            if (fBlockPrefetchEnabled)
+            {
+                ReadBlockFromPrefetch(block, pindex, consensus_params);
+            }
+            else
+            {
+                ReadBlockFromDisk(block, pindex, consensus_params);
+            }
+
             for (const CTransaction& tx : block.vtx)
             {
                 if (AddToWalletIfInvolvingMe(tx, &block, pindex->nHeight, fUpdate))
@@ -4154,6 +4163,11 @@ int CWallet::ScanForWalletTransactions(CBlockIndex* pindexStart, bool fUpdate)
                 nNow = GetTime();
                 LogPrintf("Still rescanning. At block %d. Progress=%.2f [ %i wallet transactions ]\n", pindex->nHeight, (double)pindex->nHeight / tip_height, mapWallet.size());
             }
+        }
+
+        if (fBlockPrefetchEnabled)
+        {
+            ClearBlockPrefetch();
         }
 
 #ifdef YCASH_WR
