@@ -1640,16 +1640,21 @@ void CWallet::IncrementNoteWitnesses(
     //    wallet that we are tracking. Step (2) above ensures that we won't
     //    attempt to re-update the notes discovered in this block even though
     //    we iterate over all of mapWallet.
-    for (auto& it : mapWallet) {
-        CWalletTx& wtx = it.second;
-        // Sprout
+
+    // Sprout
+    for (const uint256& wtxid : setSiftedSprout) {
+        CWalletTx& wtx = mapWallet.at(wtxid);
         ::IncrementNoteWitnesses(wtx.mapSproutNoteData,
                                  noteCommitmentsSprout,
                                  nullifiersSprout,
                                  chainHeight,
                                  prevWitCacheSize,
                                  nWitnessCacheSize);
-        // Sapling
+    }
+
+    // Sapling
+    for (const uint256& wtxid : setSiftedSapling) {
+        CWalletTx& wtx = mapWallet.at(wtxid);
         ::IncrementNoteWitnesses(wtx.mapSaplingNoteData,
                                  noteCommitmentsSapling,
                                  nullifiersSapling,
