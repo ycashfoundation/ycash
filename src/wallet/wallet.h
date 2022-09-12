@@ -285,11 +285,11 @@ public:
     //In Memory Only
     bool witnessRootValidated;
 
-    SproutNoteData() : address(), nullifier(), witnessHeight {-1}, witnessRootValidated {false} { }
+    SproutNoteData() : address(), nullifier(), witnessHeight {-1}, spentHeight(), witnessRootValidated {false} { }
     SproutNoteData(libzcash::SproutPaymentAddress a) :
-            address {a}, nullifier(), witnessHeight {-1}, witnessRootValidated {false} { }
+            address {a}, nullifier(), witnessHeight {-1}, spentHeight(), witnessRootValidated {false} { }
     SproutNoteData(libzcash::SproutPaymentAddress a, uint256 n) :
-            address {a}, nullifier {n}, witnessHeight {-1}, witnessRootValidated {false} { }
+            address {a}, nullifier {n}, witnessHeight {-1}, spentHeight(), witnessRootValidated {false} { }
 #else
     SproutNoteData() : address(), nullifier(), witnessHeight {-1}, spentHeight() { }
     SproutNoteData(libzcash::SproutPaymentAddress a) :
@@ -330,7 +330,7 @@ public:
      * See the comment in that class for a full description.
      */
 #ifdef YCASH_WR
-    SaplingNoteData() : witnessHeight {-1}, nullifier(), witnessRootValidated {false} { }
+    SaplingNoteData() : witnessHeight {-1}, nullifier(), spentHeight(), witnessRootValidated {false} { }
     SaplingNoteData(libzcash::SaplingIncomingViewingKey ivk) : ivk {ivk}, witnessHeight {-1}, nullifier(), witnessRootValidated {false} { }
     SaplingNoteData(libzcash::SaplingIncomingViewingKey ivk, uint256 n) : ivk {ivk}, witnessHeight {-1}, nullifier(n), witnessRootValidated {false} { }
 #else
@@ -350,10 +350,6 @@ public:
     libzcash::SaplingIncomingViewingKey ivk;
     std::optional<uint256> nullifier;
 
-#ifdef YCASH_WR
-    //In Memory Only
-    bool witnessRootValidated;
-#else
     /**
      * (memory only) Block height at which this note was observed to be spent.
      *
@@ -366,6 +362,10 @@ public:
      * rather than a correctness issue).
      */
     std::optional<int> spentHeight;
+
+#ifdef YCASH_WR
+    //In Memory Only
+    bool witnessRootValidated;
 #endif // YCASH_WR
 
     ADD_SERIALIZE_METHODS;
