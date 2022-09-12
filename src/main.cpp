@@ -99,6 +99,8 @@ std::vector<const CBlockIndex*> vPindexQueue;
 std::mutex mutex_prefetch_queue;
 std::mutex mutex_prefetch_cache;
 
+bool fSkipScanPreFork = DEFAULT_SKIP_SCAN_PRE_FORK;
+
 std::optional<unsigned int> expiryDeltaArg = std::nullopt;
 
 CFeeRate minRelayTxFee = CFeeRate(DEFAULT_MIN_RELAY_TX_FEE);

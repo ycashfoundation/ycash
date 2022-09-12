@@ -2750,6 +2750,12 @@ bool CWallet::AddToWalletIfInvolvingMe(const CTransaction& tx, const CBlock* pbl
 
 void CWallet::SyncTransaction(const CTransaction& tx, const CBlock* pblock, const int nHeight)
 {
+    if (fSkipScanPreFork)
+    {
+        if (nHeight < Params().GetConsensus().vUpgrades[Consensus::UPGRADE_YCASH].nActivationHeight)
+            return; // Skip txes from pre-fork blocks
+    }
+
     LOCK(cs_wallet);
     if (!AddToWalletIfInvolvingMe(tx, pblock, nHeight, true))
         return; // Not one of ours
@@ -4274,7 +4280,9 @@ int CWallet::ScanForWalletTransactions(CBlockIndex* pindexStart, bool fUpdate)
 
         // no need to read and scan block, if block was created before
         // our wallet birthday (as adjusted for block time variability)
-        while (pindex && nTimeFirstKey && pindex->GetBlockTime() < nTimeFirstKey - TIMESTAMP_WINDOW) {
+        // The same applies for pre-fork blocks, if -skipscanprefork option is used
+        while (pindex && ((nTimeFirstKey && pindex->GetBlockTime() < nTimeFirstKey - TIMESTAMP_WINDOW) 
+            || (fSkipScanPreFork && pindex->nHeight < consensus_params.vUpgrades[Consensus::UPGRADE_YCASH].nActivationHeight))) {
             pindex = chainActive.Next(pindex);
         }
 

@@ -137,6 +137,9 @@ static const unsigned int DEFAULT_PREFETCH_NUM_THREADS = 8;
 /** Default for -prefetchnumblocks */
 static const unsigned int DEFAULT_PREFETCH_NUM_BLOCKS = 2048;
 
+/** Default for -skipscanprefork */
+static const bool DEFAULT_SKIP_SCAN_PRE_FORK = false;
+
 #define equihash_parameters_acceptable(N, K) \
     ((CBlockHeader::HEADER_SIZE + equihash_solution_size(N, K))*MAX_HEADERS_RESULTS < \
      MAX_PROTOCOL_MESSAGE_LENGTH-1000)
@@ -227,7 +230,9 @@ static const uint64_t MIN_DISK_SPACE_FOR_BLOCK_FILES = 550 * 1024 * 1024;
 /** Block prefetch cache */
 extern bool fBlockPrefetchEnabled;
 extern unsigned int nPrefetchNumThreads;
-extern unsigned int nPrefetchNumBlocks;;
+extern unsigned int nPrefetchNumBlocks;
+
+extern bool fSkipScanPreFork;
 
 /** Register with a network node to receive its signals */
 void RegisterNodeSignals(CNodeSignals& nodeSignals);
