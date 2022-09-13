@@ -1881,6 +1881,9 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
         LOCK(pwalletMain->cs_wallet);
         LogPrintf("setKeyPool.size() = %u\n",      pwalletMain->setKeyPool.size());
         LogPrintf("mapWallet.size() = %u\n",       pwalletMain->mapWallet.size());
+#ifdef YCASH_WR
+        LogPrintf("setExWallet.size() = %u\n",       pwalletMain->setExWallet.size());
+#endif // YCASH_WR
         LogPrintf("mapAddressBook.size() = %u\n",  pwalletMain->mapAddressBook.size());
     }
 #endif

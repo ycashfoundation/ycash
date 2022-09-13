@@ -140,6 +140,10 @@ public:
     bool EraseArcTx(uint256 hash);
     bool EraseArcSproutOp(uint256 nullifier);
     bool EraseArcSaplingOp(uint256 nullifier);
+
+    /** Keep the log of deleted wallet transactions */
+    bool WriteExTx(uint256 hash);
+    bool EraseExTx(uint256 hash);
 #endif // YCASH_WR
 
     bool WriteTx(uint256 hash, const CWalletTx& wtx);
@@ -183,9 +187,9 @@ public:
 
     DBErrors ReorderTransactions(CWallet* pwallet);
     DBErrors LoadWallet(CWallet* pwallet);
-#ifdef YCASH_WR
     static bool Compact(CDBEnv& dbenv, const std::string& strFile);
-    DBErrors FindWalletTxToZap(CWallet* pwallet, std::vector<uint256>& vTxHash, std::vector<CWalletTx>& vWtx, std::vector<uint256>& vArcHash, std::vector<uint256>& vArcSproutNullifier, std::vector<uint256>& vArcSaplingNullifier);
+#ifdef YCASH_WR
+    DBErrors FindWalletTxToZap(CWallet* pwallet, std::vector<uint256>& vTxHash, std::vector<CWalletTx>& vWtx, std::vector<uint256>& vExTxHash, std::vector<uint256>& vArcHash, std::vector<uint256>& vArcSproutNullifier, std::vector<uint256>& vArcSaplingNullifier);
 #else
     DBErrors FindWalletTxToZap(CWallet* pwallet, std::vector<uint256>& vTxHash, std::vector<CWalletTx>& vWtx);
 #endif // YCASH_WR

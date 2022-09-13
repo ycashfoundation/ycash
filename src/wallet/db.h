@@ -60,9 +60,7 @@ public:
                         RECOVER_FAIL };
     VerifyResult Verify(const std::string& strFile, bool (*recoverFunc)(CDBEnv& dbenv, const std::string& strFile));
 
-#ifdef YCASH_WR
     bool Compact(const std::string& strFile);
-#endif // YCASH_WR
 
     /**
      * Salvage data from a file that Verify says is bad.

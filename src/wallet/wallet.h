@@ -52,9 +52,9 @@ extern bool fPayAtLeastCustomFee;
 #ifdef YCASH_WR
 extern bool fTxDeleteEnabled;
 extern bool fTxConflictDeleteEnabled;
-extern int fDeleteInterval;
-extern unsigned int fDeleteTransactionsAfterNBlocks;
-extern unsigned int fKeepLastNTransactions;
+extern int nDeleteInterval;
+extern unsigned int nDeleteTransactionsAfterNBlocks;
+extern unsigned int nKeepLastNTransactions;
 #endif // YCASH_WR
 
 static const unsigned int DEFAULT_KEYPOOL_SIZE = 100;
@@ -85,7 +85,7 @@ static const size_t HD_WALLET_SEED_LENGTH = 32;
 
 #ifdef YCASH_WR
 //Default Transaction Rentention N-BLOCKS
-static const int DEFAULT_TX_DELETE_INTERVAL = 1000;
+static const int DEFAULT_TX_DELETE_INTERVAL = 2000;
 
 //Default Transaction Rentention N-BLOCKS
 static const unsigned int DEFAULT_TX_RETENTION_BLOCKS = 10000;
@@ -908,8 +908,8 @@ protected:
 #ifdef YCASH_WR
     int SproutWitnessMinimumHeight(const uint256& nullifier, int nWitnessHeight, int nMinimumHeight);
     int SaplingWitnessMinimumHeight(const uint256& nullifier, int nWitnessHeight, int nMinimumHeight);
-    int VerifyAndSetInitialWitness(const CBlockIndex* pindex, bool witnessOnly);
-    void BuildWitnessCache(const CBlockIndex* pindex, bool witnessOnly); 
+    int VerifyAndSetInitialWitness(const CBlockIndex* pindex, bool witnessOnly, const CBlock* pblockIn);
+    void BuildWitnessCache(const CBlockIndex* pindex, bool witnessOnly, const CBlock* pblockIn);
     void DecrementNoteWitnessesWR(const CBlockIndex* pindex);
 #endif // YCASH_WR
     /**
@@ -1101,9 +1101,17 @@ public:
 
     std::map<uint256, CWalletTx> mapWallet;
 
+#ifdef YCASH_WR
+    std::set<uint256> setExWallet;
+    void AddToEx(const uint256& wtxid, bool fFromLoadWallet);
+#endif // YCASH_WR
+
     std::set<uint256> setSiftedSprout;
     std::set<uint256> setSiftedSapling;
     void AddToSifted(const uint256& wtxid);
+#ifdef YCASH_WR
+    void RemoveFromSifted(const uint256& wtxid);
+#endif // YCASH_WR
 
     int64_t nOrderPosNext;
     std::map<uint256, int> mapRequestCount;
