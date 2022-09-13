@@ -233,6 +233,7 @@ extern unsigned int nPrefetchNumThreads;
 extern unsigned int nPrefetchNumBlocks;
 
 extern bool fSkipScanPreFork;
+extern int64_t nForceBirthday;
 
 /** Register with a network node to receive its signals */
 void RegisterNodeSignals(CNodeSignals& nodeSignals);

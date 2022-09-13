@@ -4300,6 +4300,7 @@ int CWallet::ScanForWalletTransactions(CBlockIndex* pindexStart, bool fUpdate)
     //const CChainParams& chainParams = Params();
     const Consensus::Params &consensus_params = Params().GetConsensus();
     CBlockIndex* pindex = pindexStart;
+    int64_t nRealBirthday = 0;
 
 #ifdef YCASH_WR
     std::set<uint256> txList;
@@ -4323,16 +4324,23 @@ int CWallet::ScanForWalletTransactions(CBlockIndex* pindexStart, bool fUpdate)
         }
 #endif // YCASH_WR
 
+        int64_t nWalletBirthday = nTimeFirstKey;
+        if (nForceBirthday)
+        {
+            nWalletBirthday = nForceBirthday;
+            LogPrintf("ScanForWalletTransactions(): Alternative wallet birthday %u forced instead of %u\n", nWalletBirthday, nTimeFirstKey);
+        }
         // no need to read and scan block, if block was created before
         // our wallet birthday (as adjusted for block time variability)
         // The same applies for pre-fork blocks, if -skipscanprefork option is used
-        while (pindex && ((nTimeFirstKey && pindex->GetBlockTime() < nTimeFirstKey - TIMESTAMP_WINDOW) 
+        while (pindex && ((nWalletBirthday && pindex->GetBlockTime() < nWalletBirthday - TIMESTAMP_WINDOW) 
             || (fSkipScanPreFork && pindex->nHeight < consensus_params.vUpgrades[Consensus::UPGRADE_YCASH].nActivationHeight))) {
             pindex = chainActive.Next(pindex);
         }
 
         int tip_height = chainActive.Tip()->nHeight;
         ShowProgress(_("Rescanning..."), 0);
+        LogPrintf("ScanForWalletTransactions(): Actual scanning started at height %i\n", pindex->nHeight);
 
         while (pindex)
         {
@@ -4386,6 +4394,11 @@ int CWallet::ScanForWalletTransactions(CBlockIndex* pindexStart, bool fUpdate)
                     myTxHashes.push_back(txid);
 #endif // YCASH_WR
                     ret++;
+                    if (GetBoolArg("-rescan", false) && !nRealBirthday)
+                    {
+                        nRealBirthday = pindex->GetBlockTime();
+                        LogPrintf("ScanForWalletTransactions(): The first significant wtx appeared at height %i. Appropriate \"wallet birthday\" would be %u\n", pindex->nHeight, nRealBirthday);
+                    }
                 }
             }
 

@@ -100,6 +100,7 @@ std::mutex mutex_prefetch_queue;
 std::mutex mutex_prefetch_cache;
 
 bool fSkipScanPreFork = DEFAULT_SKIP_SCAN_PRE_FORK;
+int64_t nForceBirthday = 0;
 
 std::optional<unsigned int> expiryDeltaArg = std::nullopt;
 
