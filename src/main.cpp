@@ -102,6 +102,9 @@ std::mutex mutex_prefetch_cache;
 bool fSkipScanPreFork = DEFAULT_SKIP_SCAN_PRE_FORK;
 int64_t nForceBirthday = 0;
 
+bool fIgnoreSpam = DEFAULT_IGNORE_SPAM;
+int nSpamOutputsMin = DEFAULT_SPAM_OUTPUTS_MIN;
+
 std::optional<unsigned int> expiryDeltaArg = std::nullopt;
 
 CFeeRate minRelayTxFee = CFeeRate(DEFAULT_MIN_RELAY_TX_FEE);

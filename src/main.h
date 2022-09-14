@@ -139,6 +139,10 @@ static const unsigned int DEFAULT_PREFETCH_NUM_BLOCKS = 2048;
 
 /** Default for -skipscanprefork */
 static const bool DEFAULT_SKIP_SCAN_PRE_FORK = false;
+/** Default for -ignorespam */
+static const bool DEFAULT_IGNORE_SPAM = false;
+/** Default for -spamoutputsmin */
+static const int DEFAULT_SPAM_OUTPUTS_MIN = 5;
 
 #define equihash_parameters_acceptable(N, K) \
     ((CBlockHeader::HEADER_SIZE + equihash_solution_size(N, K))*MAX_HEADERS_RESULTS < \
@@ -234,6 +238,9 @@ extern unsigned int nPrefetchNumBlocks;
 
 extern bool fSkipScanPreFork;
 extern int64_t nForceBirthday;
+
+extern bool fIgnoreSpam;
+extern int nSpamOutputsMin;
 
 /** Register with a network node to receive its signals */
 void RegisterNodeSignals(CNodeSignals& nodeSignals);

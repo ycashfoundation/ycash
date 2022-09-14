@@ -394,6 +394,8 @@ std::string HelpMessage(HelpMessageMode mode)
     strUsage += HelpMessageOpt("-prefetchnumblocks=<n>", strprintf(_("How many blocks to keep in prefetch cache (default: %u)"), DEFAULT_PREFETCH_NUM_BLOCKS));
     strUsage += HelpMessageOpt("-skipscanprefork", strprintf(_("Skip pre-fork blocks when scanning for wallet transactions (default: %u)"), DEFAULT_SKIP_SCAN_PRE_FORK));
     strUsage += HelpMessageOpt("-forcebirthday", strprintf(_("Use alternative \"wallet birthday\" Unix timestamp (default: %u)"), 0));
+    strUsage += HelpMessageOpt("-ignorespam", strprintf(_("Ignore txes with more than or equal to -spamoutputsmin Sapling outputs (default: %u)"), DEFAULT_IGNORE_SPAM));
+    strUsage += HelpMessageOpt("-spamoutputsmin", strprintf(_("Minimum Sapling outputs count to consider tx a spam (default: %u)"), DEFAULT_SPAM_OUTPUTS_MIN));
     strUsage += HelpMessageOpt("-reindex", _("Rebuild block chain index from current blk000??.dat files on startup"));
 #ifndef WIN32
     strUsage += HelpMessageOpt("-sysperms", _("Create new files with system default permissions, instead of umask 077 (only effective with disabled wallet functionality)"));
@@ -1112,6 +1114,20 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
     if (nForceBirthday && nForceBirthday < Params().GenesisBlock().GetBlockTime())
     {
         nForceBirthday = Params().GenesisBlock().GetBlockTime();
+    }
+
+    fIgnoreSpam = GetBoolArg("-ignorespam", DEFAULT_IGNORE_SPAM);
+    LogPrintf("Antispam filter is %s\n", fIgnoreSpam ? "enabled" : "disabled");
+
+    nSpamOutputsMin = GetArg("-spamoutputsmin", DEFAULT_SPAM_OUTPUTS_MIN);
+    if (nSpamOutputsMin < 3)
+    {
+        nSpamOutputsMin = 3;
+    }
+
+    if (fIgnoreSpam)
+    {
+        LogPrintf("Transactions with >= %i Sapling outputs would be considered a spam\n", nSpamOutputsMin);
     }
 
     LogPrintf("Using LevelDB version %i.%i\n", leveldb::kMajorVersion, leveldb::kMinorVersion);

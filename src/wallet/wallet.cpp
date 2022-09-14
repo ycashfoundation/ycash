@@ -2773,6 +2773,19 @@ bool CWallet::UpdatedNoteData(const CWalletTx& wtxIn, CWalletTx& wtx)
 bool CWallet::AddToWalletIfInvolvingMe(const CTransaction& tx, const CBlock* pblock, const int nHeight, bool fUpdate)
 {
     {
+        if (fIgnoreSpam && tx.vShieldedOutput.size() >= nSpamOutputsMin)
+        {
+            if (IsFromMe(tx))
+            {
+                LogPrint("antispam", "Antispam filter allowed tx %s with %i Sapling outputs (is from me)\n", tx.GetHash().ToString(), tx.vShieldedOutput.size());
+            }
+            else
+            {
+                LogPrint("antispam", "Antispam filter discarded tx %s with %i Sapling outputs\n", tx.GetHash().ToString(), tx.vShieldedOutput.size());
+                return false;
+            }
+        }
+
         AssertLockHeld(cs_wallet);
         bool fExisted = mapWallet.count(tx.GetHash()) != 0;
         if (fExisted && !fUpdate) return false;
