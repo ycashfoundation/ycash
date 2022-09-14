@@ -2663,7 +2663,6 @@ bool CWallet::AddToWallet(const CWalletTx& wtxIn, bool fFromLoadWallet, CWalletD
                              wtxIn.hashBlock.ToString());
             }
             AddToSpends(hash);
-            AddToSifted(hash);
         }
 
         bool fUpdated = false;
@@ -2697,6 +2696,8 @@ bool CWallet::AddToWallet(const CWalletTx& wtxIn, bool fFromLoadWallet, CWalletD
         // Write to disk
         if (fInsertedNew || fUpdated)
         {
+            AddToSifted(hash);
+
             if (!wtx.WriteToDisk(pwalletdb))
                 return false;
         }
