@@ -89,8 +89,11 @@ TEST(FoundersRewardTest, create_testnet_2of3multisig) {
 
 static int GetLastFoundersRewardHeight(const Consensus::Params& params) {
     int blossomActivationHeight = Params().GetConsensus().vUpgrades[Consensus::UPGRADE_BLOSSOM].nActivationHeight;
+    int ycashActivationHeight = Params().GetConsensus().vUpgrades[Consensus::UPGRADE_YCASH].nActivationHeight;
     bool blossom = blossomActivationHeight != Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
-    return params.GetLastFoundersRewardBlockHeight(blossom ? blossomActivationHeight : 0);
+    bool ycash = ycashActivationHeight != Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
+    // Ycash Founder's rewards doesn't end, neither Funding Streams take the place 
+    return params.GetLastFoundersRewardBlockHeight((blossom && !ycash) ? blossomActivationHeight : 0);
 }
 
 // Utility method to check the number of unique addresses from height 1 to maxHeight
