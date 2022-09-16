@@ -91,6 +91,20 @@ uint64_t nPruneTarget = 0;
 bool fAlerts = DEFAULT_ALERTS;
 int64_t nMaxTipAge = DEFAULT_MAX_TIP_AGE;
 
+bool fBlockPrefetchEnabled = DEFAULT_BLOCK_PREFETCH_ENABLED;
+unsigned int nPrefetchNumThreads = DEFAULT_PREFETCH_NUM_THREADS;
+unsigned int nPrefetchNumBlocks = DEFAULT_PREFETCH_NUM_BLOCKS;
+std::map<const uint256, const CBlock> mapPrefetchCache;
+std::vector<const CBlockIndex*> vPindexQueue;
+std::mutex mutex_prefetch_queue;
+std::mutex mutex_prefetch_cache;
+
+bool fSkipScanPreFork = DEFAULT_SKIP_SCAN_PRE_FORK;
+int64_t nForceBirthday = 0;
+
+bool fIgnoreSpam = DEFAULT_IGNORE_SPAM;
+int nSpamOutputsMin = DEFAULT_SPAM_OUTPUTS_MIN;
+
 std::optional<unsigned int> expiryDeltaArg = std::nullopt;
 
 CFeeRate minRelayTxFee = CFeeRate(DEFAULT_MIN_RELAY_TX_FEE);
@@ -1933,6 +1947,89 @@ bool ReadBlockFromDisk(CBlock& block, const CBlockIndex* pindex, const Consensus
         return error("ReadBlockFromDisk(CBlock&, CBlockIndex*): GetHash() doesn't match index for %s at %s",
                 pindex->ToString(), pindex->GetBlockPos().ToString());
     return true;
+}
+
+static bool PrefetchWorker(const Consensus::Params& consensusParams)
+{
+    const CBlockIndex* pblockindex;
+    CBlock nextBlock;
+    int nQueueSize;
+
+    while (true)
+    {
+        mutex_prefetch_queue.lock();
+
+        if (vPindexQueue.size())
+        {
+            pblockindex = *vPindexQueue.begin();
+            vPindexQueue.erase(vPindexQueue.begin());
+            mutex_prefetch_queue.unlock();
+
+            if (ReadBlockFromDisk(nextBlock, pblockindex, consensusParams))
+            {
+                mutex_prefetch_cache.lock();
+                mapPrefetchCache.emplace(std::pair(pblockindex->GetBlockHash(), nextBlock));
+                mutex_prefetch_cache.unlock();
+            }
+        }
+        else
+        {
+            mutex_prefetch_queue.unlock();
+            break;
+        }
+    }
+
+    return true;
+}
+
+void ClearBlockPrefetch()
+{
+    mapPrefetchCache.clear();
+    vPindexQueue.resize(0);
+}
+
+bool ReadBlockFromPrefetch(CBlock& block, const CBlockIndex* pindex, const Consensus::Params& consensusParams)
+{
+    bool block_result = false;
+    const uint256 hash = pindex->GetBlockHash();
+    const int height = pindex->nHeight;
+
+    if (mapPrefetchCache.find(hash) != mapPrefetchCache.end()) {
+        block = mapPrefetchCache.at(hash);
+        block_result = true;
+    }
+
+    if (height % nPrefetchNumBlocks == 0)
+    {
+        ClearBlockPrefetch();
+        vPindexQueue.reserve(nPrefetchNumBlocks);
+        std::vector<std::future<bool>> vPrefetchFutures;
+        CBlockIndex *pindex_next = chainActive.Next(pindex);
+        int j = 0;
+
+        while (pindex_next && j < nPrefetchNumBlocks) {
+            vPindexQueue.emplace_back(pindex_next);
+            pindex_next = chainActive.Next(pindex_next);
+            j++;
+        }
+
+        for (int b = 0; b < nPrefetchNumThreads; b++)
+        {
+            vPrefetchFutures.emplace_back(std::async(std::launch::async, PrefetchWorker, consensusParams));
+        }
+
+        for (auto &one_future : vPrefetchFutures) {
+            one_future.get();
+        }
+
+        vPrefetchFutures.resize(0);
+    }
+
+    if (!block_result) {
+        block_result = ReadBlockFromDisk(block, pindex, consensusParams);
+    }
+
+    return block_result;
 }
 
 CAmount GetBlockSubsidy(int nHeight, const Consensus::Params& consensusParams)
@@ -4151,6 +4248,9 @@ bool CheckBlock(const CBlock& block,
 {
     // These are checks that are independent of context.
 
+    if (block.fChecked)
+        return true;
+
     // Check that the header is valid (particularly PoW).  This is mostly
     // redundant with the call in AcceptBlockHeader.
     if (!CheckBlockHeader(block, state, chainparams, fCheckPOW))
@@ -4206,6 +4306,9 @@ bool CheckBlock(const CBlock& block,
     if (nSigOps > MAX_BLOCK_SIGOPS)
         return state.DoS(100, error("CheckBlock(): out-of-bounds SigOpCount"),
                          REJECT_INVALID, "bad-blk-sigops", true);
+
+    if (fCheckPOW && fCheckMerkleRoot)
+        block.fChecked = true;
 
     return true;
 }
