@@ -2077,6 +2077,20 @@ int CWallet::VerifyAndSetInitialWitness(const CBlockIndex* pindex, bool witnessO
     return nMinimumHeight;
 }
 
+static SproutWitness AppendSingleSproutCommitment(const SproutWitness& witness, const uint256& commitment)
+{
+    SproutWitness sw(witness);
+    sw.append(commitment);
+    return sw;
+}
+
+static SaplingWitness AppendSingleSaplingCommitment(const SaplingWitness& witness, const uint256& commitment)
+{
+    SaplingWitness sw(witness);
+    sw.append(commitment);
+    return sw;
+}
+
 void CWallet::BuildWitnessCache(const CBlockIndex* pindex, bool witnessOnly, const CBlock* pblockIn)
 {
     LogPrint("wr", "BuildWitnessCache() enter\n");
@@ -2162,6 +2176,9 @@ void CWallet::BuildWitnessCache(const CBlockIndex* pindex, bool witnessOnly, con
         std::vector<uint256> vSproutCommitments;
         std::vector<uint256> vSaplingCommitments;
 
+        std::vector<SproutNoteData*> vSproutNoteData;
+        std::vector<SaplingNoteData*> vSaplingNoteData;
+
         if (setSiftedSprout.size())
         {
             for (const CTransaction &tx : pblock->vtx)
@@ -2194,15 +2211,34 @@ void CWallet::BuildWitnessCache(const CBlockIndex* pindex, bool witnessOnly, con
                                 nd.witnesses.resize(WITNESS_CACHE_SIZE);
                             }
 
-                            for (const uint256& commitment : vSproutCommitments)
-                            {
-                                nd.witnesses.front().append(commitment);
-                            }
+                            // for async append of commitments
+                            vSproutNoteData.push_back(&nd);
+
                             nd.witnessHeight = pblockindex->nHeight;
                         }
                     }
                 }
             }
+
+            // Parallelization with std::async
+            std::vector<std::future<SproutWitness>> vSproutWitnessFutures;
+            for (const auto& commitment : vSproutCommitments)
+            {
+                for (auto pnd : vSproutNoteData)
+                {
+                    vSproutWitnessFutures.emplace_back(std::async(std::launch::async, AppendSingleSproutCommitment, pnd->witnesses.front(), commitment));
+                }
+
+                assert(vSproutWitnessFutures.size() == vSproutNoteData.size());
+
+                for (int i = 0; i < vSproutWitnessFutures.size(); i++)
+                {
+                    vSproutNoteData.at(i)->witnesses.front() = vSproutWitnessFutures.at(i).get();
+                }
+
+                vSproutWitnessFutures.resize(0);
+            }
+
         }
 
         if (setSiftedSapling.size())
@@ -2234,14 +2270,32 @@ void CWallet::BuildWitnessCache(const CBlockIndex* pindex, bool witnessOnly, con
                                 nd.witnesses.resize(WITNESS_CACHE_SIZE);
                             }
 
-                            for (const uint256& commitment : vSaplingCommitments)
-                            {
-                                nd.witnesses.front().append(commitment);
-                            }
+                            // for async append of commitments
+                            vSaplingNoteData.push_back(&nd);
+
                             nd.witnessHeight = pblockindex->nHeight;
                         }
                     }
                 }
+            }
+
+            // Parallelization with std::async
+            std::vector<std::future<SaplingWitness>> vSaplingWitnessFutures;
+            for (const auto& commitment : vSaplingCommitments)
+            {
+                for (auto pnd : vSaplingNoteData)
+                {
+                    vSaplingWitnessFutures.emplace_back(std::async(std::launch::async, AppendSingleSaplingCommitment, pnd->witnesses.front(), commitment));
+                }
+
+                assert(vSaplingWitnessFutures.size() == vSaplingNoteData.size());
+
+                for (int i = 0; i < vSaplingWitnessFutures.size(); i++)
+                {
+                    vSaplingNoteData.at(i)->witnesses.front() = vSaplingWitnessFutures.at(i).get();
+                }
+
+                vSaplingWitnessFutures.resize(0);
             }
         }
 
