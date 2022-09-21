@@ -2880,6 +2880,9 @@ UniValue zc_benchmark(const UniValue& params, bool fHelp)
         } else if (benchmarktype == "trydecryptsaplingnotes") {
             int nKeys = params[2].get_int();
             sample_times.push_back(benchmark_try_decrypt_sapling_notes(nKeys));
+        } else if (benchmarktype == "tryasyncdecryptsaplingnotes") {
+            int nKeys = params[2].get_int();
+            sample_times.push_back(benchmark_try_async_decrypt_sapling_notes(nKeys));
         } else if (benchmarktype == "incnotewitnesses") {
             int nTxs = params[2].get_int();
             sample_times.push_back(benchmark_increment_sprout_note_witnesses(nTxs));

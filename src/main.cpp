@@ -105,6 +105,8 @@ int64_t nForceBirthday = 0;
 bool fIgnoreSpam = DEFAULT_IGNORE_SPAM;
 int nSpamOutputsMin = DEFAULT_SPAM_OUTPUTS_MIN;
 
+bool fAsyncNoteDecryption = DEFAULT_ASYNC_NOTE_DECRYPTION;
+
 std::optional<unsigned int> expiryDeltaArg = std::nullopt;
 
 CFeeRate minRelayTxFee = CFeeRate(DEFAULT_MIN_RELAY_TX_FEE);

@@ -396,6 +396,7 @@ std::string HelpMessage(HelpMessageMode mode)
     strUsage += HelpMessageOpt("-forcebirthday", strprintf(_("Use alternative \"wallet birthday\" Unix timestamp (default: %u)"), 0));
     strUsage += HelpMessageOpt("-ignorespam", strprintf(_("Ignore txes with more than or equal to -spamoutputsmin Sapling outputs (default: %u)"), DEFAULT_IGNORE_SPAM));
     strUsage += HelpMessageOpt("-spamoutputsmin", strprintf(_("Minimum Sapling outputs count to consider tx a spam (default: %u)"), DEFAULT_SPAM_OUTPUTS_MIN));
+    strUsage += HelpMessageOpt("-asyncnotedecryption", strprintf(_("Option to toggle parallel Sapling note trial decryption (default: %u)"), DEFAULT_ASYNC_NOTE_DECRYPTION));
     strUsage += HelpMessageOpt("-reindex", _("Rebuild block chain index from current blk000??.dat files on startup"));
 #ifndef WIN32
     strUsage += HelpMessageOpt("-sysperms", _("Create new files with system default permissions, instead of umask 077 (only effective with disabled wallet functionality)"));
@@ -1129,6 +1130,9 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
     {
         LogPrintf("Transactions with >= %i Sapling outputs would be considered a spam\n", nSpamOutputsMin);
     }
+
+    fAsyncNoteDecryption = GetBoolArg("-asyncnotedecryption", DEFAULT_ASYNC_NOTE_DECRYPTION);
+    LogPrintf("Asynchronous Sapling note trial decryption is %s\n", fAsyncNoteDecryption ? "enabled" : "disabled");
 
     LogPrintf("Using LevelDB version %i.%i\n", leveldb::kMajorVersion, leveldb::kMinorVersion);
 
