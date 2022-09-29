@@ -354,6 +354,8 @@ struct CNodeStateStats {
 
 CAmount GetMinRelayFee(const CTransaction& tx, unsigned int nBytes, bool fAllowFree);
 
+CAmount PerSaplingOutputFees(const CTransaction& tx, unsigned int nAdditionalOutputs);
+
 /**
  * Count ECDSA signature operations the old-fashioned (pre-0.6) way
  * @return number of sigops this transaction's outputs will produce when spent

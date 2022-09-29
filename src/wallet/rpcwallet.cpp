@@ -4265,6 +4265,9 @@ UniValue z_sendmany(const UniValue& params, bool fHelp)
 
     // Fee in Zatoshis, not currency format)
     CAmount nFee        = DEFAULT_FEE;
+    // adjust fee to comply with per-Sapling-output recomendation
+    // and check if we should add Sapling change output (not added to tx yet)
+    nFee = std::max(nFee, PerSaplingOutputFees(tx, fromSapling ? 1 : 0));
     CAmount nDefaultFee = nFee;
 
     if (params.size() > 3) {
