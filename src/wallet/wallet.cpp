@@ -2831,11 +2831,11 @@ bool CWallet::AddToWalletIfInvolvingMe(const CTransaction& tx, const CBlock* pbl
         {
             if (IsFromMe(tx))
             {
-                LogPrint("antispam", "Antispam filter allowed tx %s with %i Sapling outputs (is from me)\n", tx.GetHash().ToString(), tx.vShieldedOutput.size());
+                LogPrint("antispam", "Antispam filter allowed tx %s with %i Sapling outputs at height %i (is from me)\n", tx.GetHash().ToString(), tx.vShieldedOutput.size(), nHeight);
             }
             else
             {
-                LogPrint("antispam", "Antispam filter discarded tx %s with %i Sapling outputs\n", tx.GetHash().ToString(), tx.vShieldedOutput.size());
+                LogPrint("antispam", "Antispam filter discarded tx %s with %i Sapling outputs at height %i\n", tx.GetHash().ToString(), tx.vShieldedOutput.size(), nHeight);
                 return false;
             }
         }
