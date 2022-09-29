@@ -105,6 +105,8 @@ int64_t nForceBirthday = 0;
 bool fIgnoreSpam = DEFAULT_IGNORE_SPAM;
 int nSpamOutputsMin = DEFAULT_SPAM_OUTPUTS_MIN;
 
+bool fAsyncNoteDecryption = DEFAULT_ASYNC_NOTE_DECRYPTION;
+
 std::optional<unsigned int> expiryDeltaArg = std::nullopt;
 
 CFeeRate minRelayTxFee = CFeeRate(DEFAULT_MIN_RELAY_TX_FEE);
@@ -1494,6 +1496,12 @@ CAmount GetMinRelayFee(const CTransaction& tx, unsigned int nBytes, bool fAllowF
     return nMinFee;
 }
 
+CAmount PerSaplingOutputFees(const CTransaction& tx, unsigned int nAdditionalOutputs = 0)
+{
+    unsigned int nSaplingOutputs = tx.vShieldedOutput.size();
+    unsigned int nTaxableOutputs = (nSaplingOutputs + nAdditionalOutputs) > DEFAULT_EXEMPT_SAPLING_OUTPUTS ? nSaplingOutputs + nAdditionalOutputs - DEFAULT_EXEMPT_SAPLING_OUTPUTS : 0;
+    return nTaxableOutputs * DEFAULT_PER_SAPLING_OUTPUT_FEE;
+}
 
 bool AcceptToMemoryPool(
         const CChainParams& chainparams,
@@ -1646,6 +1654,16 @@ bool AcceptToMemoryPool(
         CAmount nValueOut = tx.GetValueOut();
         CAmount nFees = nValueIn-nValueOut;
         double dPriority = view.GetPriority(tx, chainActive.Height());
+
+        // Let's check if per-Sapling-output fee recomendation is satisfied
+        CAmount txPerSaplingOutputFees = PerSaplingOutputFees(tx);
+        if (nFees < txPerSaplingOutputFees)
+        {
+            // do not accept to mempool
+            return state.DoS(0, error("AcceptToMemoryPool: not enough per-Sapling-output fees %s, %d < %d",
+                                      hash.ToString(), nFees, txPerSaplingOutputFees),
+                             REJECT_INSUFFICIENTFEE, "insufficient per-Sapling-output fee");
+        }
 
         // Keep track of transactions that spend a coinbase, which we re-scan
         // during reorgs to ensure COINBASE_MATURITY is still met.

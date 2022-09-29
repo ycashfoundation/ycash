@@ -2077,6 +2077,20 @@ int CWallet::VerifyAndSetInitialWitness(const CBlockIndex* pindex, bool witnessO
     return nMinimumHeight;
 }
 
+static SproutWitness AppendSingleSproutCommitment(const SproutWitness& witness, const uint256& commitment)
+{
+    SproutWitness sw(witness);
+    sw.append(commitment);
+    return sw;
+}
+
+static SaplingWitness AppendSingleSaplingCommitment(const SaplingWitness& witness, const uint256& commitment)
+{
+    SaplingWitness sw(witness);
+    sw.append(commitment);
+    return sw;
+}
+
 void CWallet::BuildWitnessCache(const CBlockIndex* pindex, bool witnessOnly, const CBlock* pblockIn)
 {
     LogPrint("wr", "BuildWitnessCache() enter\n");
@@ -2162,6 +2176,9 @@ void CWallet::BuildWitnessCache(const CBlockIndex* pindex, bool witnessOnly, con
         std::vector<uint256> vSproutCommitments;
         std::vector<uint256> vSaplingCommitments;
 
+        std::vector<SproutNoteData*> vSproutNoteData;
+        std::vector<SaplingNoteData*> vSaplingNoteData;
+
         if (setSiftedSprout.size())
         {
             for (const CTransaction &tx : pblock->vtx)
@@ -2194,15 +2211,34 @@ void CWallet::BuildWitnessCache(const CBlockIndex* pindex, bool witnessOnly, con
                                 nd.witnesses.resize(WITNESS_CACHE_SIZE);
                             }
 
-                            for (const uint256& commitment : vSproutCommitments)
-                            {
-                                nd.witnesses.front().append(commitment);
-                            }
+                            // for async append of commitments
+                            vSproutNoteData.push_back(&nd);
+
                             nd.witnessHeight = pblockindex->nHeight;
                         }
                     }
                 }
             }
+
+            // Parallelization with std::async
+            std::vector<std::future<SproutWitness>> vSproutWitnessFutures;
+            for (const auto& commitment : vSproutCommitments)
+            {
+                for (auto pnd : vSproutNoteData)
+                {
+                    vSproutWitnessFutures.emplace_back(std::async(std::launch::async, AppendSingleSproutCommitment, pnd->witnesses.front(), commitment));
+                }
+
+                assert(vSproutWitnessFutures.size() == vSproutNoteData.size());
+
+                for (int i = 0; i < vSproutWitnessFutures.size(); i++)
+                {
+                    vSproutNoteData.at(i)->witnesses.front() = vSproutWitnessFutures.at(i).get();
+                }
+
+                vSproutWitnessFutures.resize(0);
+            }
+
         }
 
         if (setSiftedSapling.size())
@@ -2234,14 +2270,32 @@ void CWallet::BuildWitnessCache(const CBlockIndex* pindex, bool witnessOnly, con
                                 nd.witnesses.resize(WITNESS_CACHE_SIZE);
                             }
 
-                            for (const uint256& commitment : vSaplingCommitments)
-                            {
-                                nd.witnesses.front().append(commitment);
-                            }
+                            // for async append of commitments
+                            vSaplingNoteData.push_back(&nd);
+
                             nd.witnessHeight = pblockindex->nHeight;
                         }
                     }
                 }
+            }
+
+            // Parallelization with std::async
+            std::vector<std::future<SaplingWitness>> vSaplingWitnessFutures;
+            for (const auto& commitment : vSaplingCommitments)
+            {
+                for (auto pnd : vSaplingNoteData)
+                {
+                    vSaplingWitnessFutures.emplace_back(std::async(std::launch::async, AppendSingleSaplingCommitment, pnd->witnesses.front(), commitment));
+                }
+
+                assert(vSaplingWitnessFutures.size() == vSaplingNoteData.size());
+
+                for (int i = 0; i < vSaplingWitnessFutures.size(); i++)
+                {
+                    vSaplingNoteData.at(i)->witnesses.front() = vSaplingWitnessFutures.at(i).get();
+                }
+
+                vSaplingWitnessFutures.resize(0);
             }
         }
 
@@ -2777,11 +2831,11 @@ bool CWallet::AddToWalletIfInvolvingMe(const CTransaction& tx, const CBlock* pbl
         {
             if (IsFromMe(tx))
             {
-                LogPrint("antispam", "Antispam filter allowed tx %s with %i Sapling outputs (is from me)\n", tx.GetHash().ToString(), tx.vShieldedOutput.size());
+                LogPrint("antispam", "Antispam filter allowed tx %s with %i Sapling outputs at height %i (is from me)\n", tx.GetHash().ToString(), tx.vShieldedOutput.size(), nHeight);
             }
             else
             {
-                LogPrint("antispam", "Antispam filter discarded tx %s with %i Sapling outputs\n", tx.GetHash().ToString(), tx.vShieldedOutput.size());
+                LogPrint("antispam", "Antispam filter discarded tx %s with %i Sapling outputs at height %i\n", tx.GetHash().ToString(), tx.vShieldedOutput.size(), nHeight);
                 return false;
             }
         }
@@ -2790,7 +2844,8 @@ bool CWallet::AddToWalletIfInvolvingMe(const CTransaction& tx, const CBlock* pbl
         bool fExisted = mapWallet.count(tx.GetHash()) != 0;
         if (fExisted && !fUpdate) return false;
         auto sproutNoteData = FindMySproutNotes(tx);
-        auto saplingNoteDataAndAddressesToAdd = FindMySaplingNotes(tx, nHeight);
+        std::pair<mapSaplingNoteData_t, SaplingIncomingViewingKeyMap> saplingNoteDataAndAddressesToAdd;
+        saplingNoteDataAndAddressesToAdd = fAsyncNoteDecryption ? FindMySaplingNotesAsync(tx, nHeight) : FindMySaplingNotes(tx, nHeight);
         auto saplingNoteData = saplingNoteDataAndAddressesToAdd.first;
         auto addressesToAdd = saplingNoteDataAndAddressesToAdd.second;
         for (const auto &addressToAdd : addressesToAdd) {
@@ -3038,6 +3093,103 @@ std::pair<mapSaplingNoteData_t, SaplingIncomingViewingKeyMap> CWallet::FindMySap
                 noteData.insert(std::make_pair(op, nd));
                 break;
             }
+        }
+    }
+
+    return std::make_pair(noteData, viewingKeysToAdd);
+}
+
+static std::pair<mapSaplingNoteData_t, SaplingIncomingViewingKeyMap> DecryptSaplingNoteWorker(const Consensus::Params &consensus_params, const SaplingIncomingViewingKey &ivk, const OutputDescription &outdesc, const int &height, const uint256 &hash, const uint32_t &i)
+{
+    mapSaplingNoteData_t noteData;
+    SaplingIncomingViewingKeyMap viewingKeysToAdd;
+
+    auto result = SaplingNotePlaintext::decrypt(consensus_params, height, outdesc.encCiphertext, ivk, outdesc.ephemeralKey, outdesc.cmu);
+    if (result)
+    {
+        // We don't cache the nullifier here as computing it requires knowledge of the note position
+        // in the commitment tree, which can only be determined when the transaction has been mined.
+        SaplingOutPoint op {hash, i};
+        SaplingNoteData nd;
+        nd.ivk = ivk;
+        noteData.insert(std::make_pair(op, nd));
+
+        auto address = ivk.address(result.value().d);
+        if (address)
+        {
+            viewingKeysToAdd.insert(make_pair(address.value(), ivk));
+        }
+    }
+
+    return std::make_pair(noteData, viewingKeysToAdd);
+}
+
+/**
+ * Finds all output notes in the given transaction that have been sent to
+ * SaplingPaymentAddresses in this wallet.
+ *
+ * It should never be necessary to call this method with a CWalletTx, because
+ * the result of FindMySaplingNotes (for the addresses available at the time) will
+ * already have been cached in CWalletTx.mapSaplingNoteData.
+ */
+std::pair<mapSaplingNoteData_t, SaplingIncomingViewingKeyMap> CWallet::FindMySaplingNotesAsync(const CTransaction &tx, int height) const
+{
+    mapSaplingNoteData_t noteData;
+    SaplingIncomingViewingKeyMap viewingKeysToAdd;
+
+    if (tx.vShieldedOutput.empty())
+    {
+        return std::make_pair(noteData, viewingKeysToAdd);
+    }
+
+    LOCK(cs_KeyStore);
+
+    std::set<SaplingIncomingViewingKey> setSaplingIvkToTest;
+
+    for (const auto& [ivk, fvk] : mapSaplingFullViewingKeys)
+    {
+        setSaplingIvkToTest.insert(ivk);
+    }
+
+    for (const auto& [address, ivk] : mapSaplingIncomingViewingKeys)
+    {
+        setSaplingIvkToTest.insert(ivk);
+    }
+
+    if (setSaplingIvkToTest.empty())
+    {
+        return std::make_pair(noteData, viewingKeysToAdd);
+    }
+
+    std::vector<std::future<std::pair<mapSaplingNoteData_t, SaplingIncomingViewingKeyMap>>> vDecryptFutures;
+    const Consensus::Params consensus_params = Params().GetConsensus();
+    uint256 hash = tx.GetHash();
+
+    // Protocol Spec: 4.19 Block Chain Scanning (Sapling)
+    for (uint32_t i = 0; i < tx.vShieldedOutput.size(); ++i)
+    {
+        const OutputDescription output = tx.vShieldedOutput[i];
+        for (SaplingIncomingViewingKey ivk : setSaplingIvkToTest)
+        {
+            vDecryptFutures.emplace_back(std::async(std::launch::async, DecryptSaplingNoteWorker, consensus_params, ivk, output, height, hash, i));
+        }
+    }
+
+    for (auto &fut : vDecryptFutures)
+    {
+        auto result_pair = fut.get();
+        if (!result_pair.first.empty())
+        {
+            noteData.insert(result_pair.first.begin(), result_pair.first.end());
+
+            for (auto [address, ivk] : result_pair.second)
+            {
+                if (mapSaplingIncomingViewingKeys.count(address) == 0)
+                {
+                    viewingKeysToAdd[address] = ivk;
+                }
+            }
+
         }
     }
 
@@ -4354,7 +4506,11 @@ int CWallet::ScanForWalletTransactions(CBlockIndex* pindexStart, bool fUpdate)
 
         int tip_height = chainActive.Tip()->nHeight;
         ShowProgress(_("Rescanning..."), 0);
-        LogPrintf("ScanForWalletTransactions(): Actual scanning started at height %i\n", pindex->nHeight);
+
+        if (pindex)
+        {
+            LogPrintf("ScanForWalletTransactions(): Actual scanning started at height %i\n", pindex->nHeight);
+        }
 
         while (pindex)
         {

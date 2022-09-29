@@ -313,6 +313,31 @@ double benchmark_try_decrypt_sapling_notes(size_t nKeys)
     return timer_stop(tv_start);
 }
 
+double benchmark_try_async_decrypt_sapling_notes(size_t nKeys)
+{
+    // Set params
+    const Consensus::Params& consensusParams = Params().GetConsensus();
+
+    auto masterKey = GetTestMasterSaplingSpendingKey();
+
+    CWallet wallet;
+
+    for (int i = 0; i < nKeys; i++) {
+        auto sk = masterKey.Derive(i);
+        wallet.AddSaplingSpendingKey(sk);
+    }
+
+    // Generate a key that has not been added to the wallet
+    auto sk = masterKey.Derive(nKeys);
+    auto tx = GetValidSaplingReceive(consensusParams, wallet, sk, 10);
+
+    struct timeval tv_start;
+    timer_start(tv_start);
+    auto noteDataMapAndAddressesToAdd = wallet.FindMySaplingNotesAsync(tx, 1);
+    assert(noteDataMapAndAddressesToAdd.first.empty());
+    return timer_stop(tv_start);
+}
+
 CWalletTx CreateSproutTxWithNoteData(const libzcash::SproutSpendingKey& sk) {
     auto wtx = GetValidSproutReceive(sk, 10, true);
     auto note = GetSproutNote(sk, wtx, 0, 1);
