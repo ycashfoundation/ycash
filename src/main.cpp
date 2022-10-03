@@ -1496,11 +1496,18 @@ CAmount GetMinRelayFee(const CTransaction& tx, unsigned int nBytes, bool fAllowF
     return nMinFee;
 }
 
-CAmount PerSaplingOutputFees(const CTransaction& tx, unsigned int nAdditionalOutputs = 0)
+CAmount PerSaplingOutputFees(const CTransaction& tx)
 {
-    unsigned int nSaplingOutputs = tx.vShieldedOutput.size();
-    unsigned int nTaxableOutputs = (nSaplingOutputs + nAdditionalOutputs) > DEFAULT_EXEMPT_SAPLING_OUTPUTS ? nSaplingOutputs + nAdditionalOutputs - DEFAULT_EXEMPT_SAPLING_OUTPUTS : 0;
-    return nTaxableOutputs * DEFAULT_PER_SAPLING_OUTPUT_FEE;
+    const unsigned int nTotalSaplingOutputs = tx.vShieldedOutput.size();
+
+    if (nTotalSaplingOutputs == 0) // no Sapling outputs
+        return 0;
+
+    if (nTotalSaplingOutputs <= DEFAULT_EXEMPT_SAPLING_OUTPUTS) // number of outputs within the "grace range"
+        return DEFAULT_PER_SAPLING_OUTPUT_FEE; // at cost of one output
+
+    // number of outputs above the "grace range"
+    return (nTotalSaplingOutputs - DEFAULT_EXEMPT_SAPLING_OUTPUTS) * DEFAULT_PER_SAPLING_OUTPUT_FEE;
 }
 
 bool AcceptToMemoryPool(
