@@ -304,6 +304,8 @@ public:
     CBloomFilter* pfilter;
     NodeId id;
     std::atomic<int> nRefCount;
+    CRollingBloomFilter addrKnown;
+    mutable CCriticalSection cs_addrKnown;
 
     const uint64_t nKeyedNetGroup;
 
@@ -333,7 +335,6 @@ public:
 
     // flood relay
     std::vector<CAddress> vAddrToSend;
-    CRollingBloomFilter addrKnown;
     bool fGetAddr;
     std::set<uint256> setKnown;
 
@@ -435,10 +436,25 @@ public:
     }
 
 
-
-    void AddAddressKnown(const CAddress& addr)
+    bool AddAddressIfNotAlreadyKnown(const CAddress& addr)
     {
-        addrKnown.insert(addr.GetKey());
+        LOCK(cs_addrKnown);
+        // Avoid adding to addrKnown after it has been reset in CloseSocketDisconnect.
+        if (fDisconnect) {
+            return false;
+        }
+        if (!addrKnown.contains(addr.GetKey())) {
+            addrKnown.insert(addr.GetKey());
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    bool IsAddressKnown(const CAddress& addr) const
+    {
+        LOCK(cs_addrKnown);
+        return addrKnown.contains(addr.GetKey());
     }
 
     void PushAddress(const CAddress& addr, FastRandomContext &insecure_rand)
@@ -446,7 +462,7 @@ public:
         // Known checking here is only to save space from duplicates.
         // SendMessages will filter it again for knowns that were added
         // after addresses were pushed.
-        if (addr.IsValid() && !addrKnown.contains(addr.GetKey())) {
+        if (addr.IsValid() && !IsAddressKnown(addr)) {
             if (vAddrToSend.size() >= MAX_ADDR_TO_SEND) {
                 vAddrToSend[insecure_rand.randrange(vAddrToSend.size())] = addr;
             } else {
@@ -460,7 +476,9 @@ public:
     {
         {
             LOCK(cs_inventory);
-            filterInventoryKnown.insert(inv.hash);
+            if (!fDisconnect) {
+                filterInventoryKnown.insert(inv.hash);
+            }
         }
     }
 
@@ -468,7 +486,7 @@ public:
     {
         {
             LOCK(cs_inventory);
-            if (inv.type == MSG_TX && filterInventoryKnown.contains(inv.hash))
+            if (fDisconnect || (inv.type == MSG_TX && filterInventoryKnown.contains(inv.hash)))
                 return;
             vInventoryToSend.push_back(inv);
         }
