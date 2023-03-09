@@ -14,7 +14,7 @@
 
 static const CAmount DEFAULT_FEE = 1000;
 static const CAmount DEFAULT_PER_SAPLING_OUTPUT_FEE = 1000;
-static const unsigned int DEFAULT_EXEMPT_SAPLING_OUTPUTS = 1;
+static const unsigned int DEFAULT_EXEMPT_SAPLING_OUTPUTS = 50;
 
 class CAutoFile;
 class CFeeRate;
