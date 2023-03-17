@@ -18,6 +18,7 @@
 #include "sync.h"
 #include "uint256.h"
 #include "utilstrencodings.h"
+#include "utiltime.h"
 #include "chainparams.h"
 
 #include <deque>
