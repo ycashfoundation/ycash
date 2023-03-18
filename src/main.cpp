@@ -103,7 +103,7 @@ bool fSkipScanPreFork = DEFAULT_SKIP_SCAN_PRE_FORK;
 int64_t nForceBirthday = 0;
 
 bool fIgnoreSpam = DEFAULT_IGNORE_SPAM;
-int nSpamOutputsMin = DEFAULT_SPAM_OUTPUTS_MIN;
+int nSpamOutputsMin = DEFAULT_SPAM_OUTPUTS_LIMIT;
 
 bool fAsyncNoteDecryption = DEFAULT_ASYNC_NOTE_DECRYPTION;
 
