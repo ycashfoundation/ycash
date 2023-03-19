@@ -588,6 +588,10 @@ bool enableVTMode()
     if (!SetConsoleMode(hOut, dwMode)) {
         return false;
     }
+
+    // set Windows console code page to UTF8, because of block graphic char we use for ascii art
+    SetConsoleOutputCP(CP_UTF8);
+
     return true;
 }
 #endif
