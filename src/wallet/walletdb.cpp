@@ -1037,6 +1037,12 @@ DBErrors CWalletDB::LoadWallet(CWallet* pwallet)
     if (wss.fIsEncrypted && (wss.nFileVersion == 40000 || wss.nFileVersion == 50000))
         return DB_NEED_REWRITE;
 
+    // Check wallet file version and rescan to update spent notes heights for optimized witness pruning
+    if ((wss.nZKeys + wss.nCZKeys) > 0 && wss.nFileVersion < 4040350) {
+        LogPrintf("Wallet version older than v4.4.3, rescan enforced to optimize witness pruning\n");
+        SoftSetBoolArg("-rescan", true);
+    }
+
     if (wss.nFileVersion < CLIENT_VERSION) // Update
         WriteVersion(CLIENT_VERSION);
 
