@@ -2009,8 +2009,8 @@ static bool PrefetchWorker(const Consensus::Params& consensusParams)
 
 void ClearBlockPrefetch()
 {
-    mapPrefetchCache.clear();
-    vPindexQueue.resize(0);
+    std::map<const uint256, const CBlock>().swap(mapPrefetchCache);
+    std::vector<const CBlockIndex *>().swap(vPindexQueue);
 }
 
 bool ReadBlockFromPrefetch(CBlock& block, const CBlockIndex* pindex, const Consensus::Params& consensusParams)
