@@ -61,6 +61,10 @@ public:
     void BuildWitnessCache(const CBlockIndex* pindex, bool witnessOnly, const CBlock* pblockIn) {
         CWallet::BuildWitnessCache(pindex, witnessOnly, pblockIn);
     }
+
+    void DecrementNoteWitnessesWR(const CBlockIndex* pindex) {
+        CWallet::DecrementNoteWitnessesWR(pindex);
+    }
 #endif // YCASH_WR
     void DecrementNoteWitnesses(const CBlockIndex* pindex) {
         CWallet::DecrementNoteWitnesses(pindex);
@@ -1319,8 +1323,7 @@ TEST(WalletTests, CachedWitnessesEmptyChain) {
     EXPECT_DEATH(wallet.DecrementNoteWitnesses(&index),
                  ".*nWitnessCacheSize > 0.*") << __FILE__ << __LINE__;
 #else
-    EXPECT_DEATH(wallet.DecrementNoteWitnessesWR(&index),
-                 ".*nWitnessCacheSize > 0.*") << __FILE__ << __LINE__;
+    EXPECT_NO_THROW(wallet.DecrementNoteWitnessesWR(&index)) << __FILE__ << __LINE__;
 #endif // YCASH_WR
 }
 
