@@ -4267,7 +4267,13 @@ UniValue z_sendmany(const UniValue& params, bool fHelp)
     CAmount nFee        = DEFAULT_FEE;
     // adjust fee to comply with per-Sapling-output recomendation (number of Sapling outputs * per-Sapling-output fee)
     unsigned int nSaplingOutputsCount = tx.vShieldedOutput.size();
-    CAmount nSaplingOutputsFee = nSaplingOutputsCount * DEFAULT_PER_SAPLING_OUTPUT_FEE;
+
+    // assume one additional Sapling output for potential change
+    if (fromSapling)
+        nSaplingOutputsCount++;
+
+    CAmount nSaplingOutputsFee = (nSaplingOutputsCount > DEFAULT_EXEMPT_SAPLING_OUTPUTS) ? (nSaplingOutputsCount - DEFAULT_EXEMPT_SAPLING_OUTPUTS) * DEFAULT_PER_SAPLING_OUTPUT_FEE : DEFAULT_PER_SAPLING_OUTPUT_FEE;
+
     nFee = std::max(nFee, nSaplingOutputsFee);
     CAmount nDefaultFee = nFee;
 

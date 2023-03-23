@@ -588,6 +588,10 @@ bool enableVTMode()
     if (!SetConsoleMode(hOut, dwMode)) {
         return false;
     }
+
+    // set Windows console code page to UTF8, because of block graphic char we use for ascii art
+    SetConsoleOutputCP(CP_UTF8);
+
     return true;
 }
 #endif
@@ -615,7 +619,7 @@ void ThreadShowMetricsScreen()
         std::cout << std::endl;
 
         // Thank you text
-        std::cout << strprintf(_("Thank you for running a %s ycashd v%s node!"), WhichNetwork(), FormatVersion(CLIENT_VERSION)) << std::endl;
+        std::cout << strprintf(_("Thank you for running a \e[1m%s ycashd %s\e[0m node!"), WhichNetwork(), FormatSubVersion(CLIENT_NAME, CLIENT_VERSION, std::vector<std::string>())) << std::endl;
         std::cout << _("You're helping to strengthen the network and contributing to a social good :)") << std::endl;
 
         // Privacy notice text

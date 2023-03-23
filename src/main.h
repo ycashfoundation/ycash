@@ -141,8 +141,8 @@ static const unsigned int DEFAULT_PREFETCH_NUM_BLOCKS = 2048;
 static const bool DEFAULT_SKIP_SCAN_PRE_FORK = false;
 /** Default for -ignorespam */
 static const bool DEFAULT_IGNORE_SPAM = false;
-/** Default for -spamoutputsmin */
-static const int DEFAULT_SPAM_OUTPUTS_MIN = 5;
+/** Default for -spamoutputslimit */
+static const int DEFAULT_SPAM_OUTPUTS_LIMIT = 50;
 
 /** Default for -asyncnotedecryption */
 static const bool DEFAULT_ASYNC_NOTE_DECRYPTION = true;

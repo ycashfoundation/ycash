@@ -394,8 +394,8 @@ std::string HelpMessage(HelpMessageMode mode)
     strUsage += HelpMessageOpt("-prefetchnumblocks=<n>", strprintf(_("How many blocks to keep in prefetch cache (default: %u)"), DEFAULT_PREFETCH_NUM_BLOCKS));
     strUsage += HelpMessageOpt("-skipscanprefork", strprintf(_("Skip pre-fork blocks when scanning for wallet transactions (default: %u)"), DEFAULT_SKIP_SCAN_PRE_FORK));
     strUsage += HelpMessageOpt("-forcebirthday", strprintf(_("Use alternative \"wallet birthday\" Unix timestamp (default: %u)"), 0));
-    strUsage += HelpMessageOpt("-ignorespam", strprintf(_("Ignore txes with more than or equal to -spamoutputsmin Sapling outputs (default: %u)"), DEFAULT_IGNORE_SPAM));
-    strUsage += HelpMessageOpt("-spamoutputsmin", strprintf(_("Minimum Sapling outputs count to consider tx a spam (default: %u)"), DEFAULT_SPAM_OUTPUTS_MIN));
+    strUsage += HelpMessageOpt("-ignorespam", strprintf(_("Ignore txes with more than or equal to -spamoutputslimit Sapling outputs (default: %u)"), DEFAULT_IGNORE_SPAM));
+    strUsage += HelpMessageOpt("-spamoutputslimit", strprintf(_("Per tx Sapling outputs count limit to consider tx a spam when -ignorespam is used (default: %u)"), DEFAULT_SPAM_OUTPUTS_LIMIT));
     strUsage += HelpMessageOpt("-asyncnotedecryption", strprintf(_("Option to toggle parallel Sapling note trial decryption (default: %u)"), DEFAULT_ASYNC_NOTE_DECRYPTION));
     strUsage += HelpMessageOpt("-reindex", _("Rebuild block chain index from current blk000??.dat files on startup"));
 #ifndef WIN32
@@ -1120,7 +1120,7 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
     fIgnoreSpam = GetBoolArg("-ignorespam", DEFAULT_IGNORE_SPAM);
     LogPrintf("Antispam filter is %s\n", fIgnoreSpam ? "enabled" : "disabled");
 
-    nSpamOutputsMin = GetArg("-spamoutputsmin", DEFAULT_SPAM_OUTPUTS_MIN);
+    nSpamOutputsMin = GetArg("-spamoutputslimit", DEFAULT_SPAM_OUTPUTS_LIMIT);
     if (nSpamOutputsMin < 3)
     {
         nSpamOutputsMin = 3;
