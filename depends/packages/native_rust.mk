@@ -1,27 +1,30 @@
 package=native_rust
-$(package)_version=1.55.0
+# To update the Rust compiler, change the version below and then run the script
+# ./contrib/devtools/update-rust-hashes.sh
+# The Rust compiler should use the same LLVM version as the Clang compiler; you
+# can check this with `rustc --version -v`.
+$(package)_version=1.63.0
 $(package)_download_path=https://static.rust-lang.org/dist
 $(package)_file_name_linux=rust-$($(package)_version)-x86_64-unknown-linux-gnu.tar.gz
-$(package)_sha256_hash_linux=2080253a2ec36ac8ed6e060d30802d888533124b8d16545cfd4af898b365eaac
-$(package)_file_name_aarch64_linux=rust-$($(package)_version)-aarch64-unknown-linux-gnu.tar.gz
-$(package)_sha256_hash_aarch64_linux=eebdb2e659ed14884a49f0457d44e5e8c9f89fca3414533752c6dbb96232c156
+$(package)_sha256_hash_linux=536bcf16807a4ff49b7b29af6e573a2f1821055bfad72c275c60e56edc693984
 $(package)_file_name_darwin=rust-$($(package)_version)-x86_64-apple-darwin.tar.gz
-$(package)_sha256_hash_darwin=2e345ac7724c192c9487a2c6bd4f6c52c884d791981510288830d27d9a0bf2f3
+$(package)_sha256_hash_darwin=37f76a45b8616e764c2663850758ce822c730e96af60168a46b818f528c1467d
 $(package)_file_name_freebsd=rust-$($(package)_version)-x86_64-unknown-freebsd.tar.gz
-$(package)_sha256_hash_freebsd=7ddb8ec4d431f64dd6428df93d46f726516970b0ca83c71c3efbfe34a42d3113
+$(package)_sha256_hash_freebsd=ebbbb80413c4f6a6c30d6e7823016e8c54b07ea273c6578cafe3da55371754e8
+$(package)_file_name_aarch64_linux=rust-$($(package)_version)-aarch64-unknown-linux-gnu.tar.gz
+$(package)_sha256_hash_aarch64_linux=26745b57500da293a8147122a5998926301350a610c164f053107cbe026d3a51
 
 # Mapping from GCC canonical hosts to Rust targets
 # If a mapping is not present, we assume they are identical, unless $host_os is
 # "darwin", in which case we assume x86_64-apple-darwin.
 $(package)_rust_target_x86_64-pc-linux-gnu=x86_64-unknown-linux-gnu
 $(package)_rust_target_x86_64-w64-mingw32=x86_64-pc-windows-gnu
-$(package)_rust_target_aarch64-linux-gnu=aarch64-unknown-linux-gnu
 
 # Mapping from Rust targets to SHA-256 hashes
-$(package)_rust_std_sha256_hash_aarch64-unknown-linux-gnu=e30063a259e32cd0e31baadcee82112ef840e0f654d5128dd79fc715ede92058
-$(package)_rust_std_sha256_hash_x86_64-apple-darwin=8888fb0a1cbc645f86e1551d27cc127697361fecab9cd414691e434976412733
-$(package)_rust_std_sha256_hash_x86_64-pc-windows-gnu=8dfab5489b485417d76a7d266fc795608ba61f9c423f8a71616e01f33e146487
-$(package)_rust_std_sha256_hash_x86_64-unknown-linux-gnu=c07c5ce96b86364601c0c471bb85105e80a5e345b3e4b3e2674e541cc2fdefcf
+$(package)_rust_std_sha256_hash_aarch64-unknown-linux-gnu=4afce4152945642fb4c1a7fa44ffe396f98ce094108ffe29b1833413e8eed49d
+$(package)_rust_std_sha256_hash_x86_64-apple-darwin=a8653b57d0efbccf3e95953cfb9c7a2ddaa68ba789edc8378c5b0b8200cc3be5
+$(package)_rust_std_sha256_hash_x86_64-pc-windows-gnu=aa6486ea84917e58dd87ea72a40175f717271024372482871a58c72089ff1e5d
+$(package)_rust_std_sha256_hash_x86_64-unknown-freebsd=9f8e178831660036f918376a84c7e98f53a3fa5ed2a297a9b56f805774968d7a
 
 define rust_target
 $(if $($(1)_rust_target_$(2)),$($(1)_rust_target_$(2)),$(if $(findstring darwin,$(3)),x86_64-apple-darwin,$(if $(findstring freebsd,$(3)),x86_64-unknown-freebsd,$(2))))

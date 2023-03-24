@@ -130,6 +130,23 @@ static const unsigned int DEFAULT_BANSCORE_THRESHOLD = 100;
 /** Default for -nurejectoldversions */
 static const bool DEFAULT_NU_REJECT_OLD_VERSIONS = true;
 
+/** Default for -blockprefetch */
+static const bool DEFAULT_BLOCK_PREFETCH_ENABLED = false;
+/** Default for -prefetchnumthreads */
+static const unsigned int DEFAULT_PREFETCH_NUM_THREADS = 8;
+/** Default for -prefetchnumblocks */
+static const unsigned int DEFAULT_PREFETCH_NUM_BLOCKS = 2048;
+
+/** Default for -skipscanprefork */
+static const bool DEFAULT_SKIP_SCAN_PRE_FORK = false;
+/** Default for -ignorespam */
+static const bool DEFAULT_IGNORE_SPAM = false;
+/** Default for -spamoutputslimit */
+static const int DEFAULT_SPAM_OUTPUTS_LIMIT = 50;
+
+/** Default for -asyncnotedecryption */
+static const bool DEFAULT_ASYNC_NOTE_DECRYPTION = true;
+
 #define equihash_parameters_acceptable(N, K) \
     ((CBlockHeader::HEADER_SIZE + equihash_solution_size(N, K))*MAX_HEADERS_RESULTS < \
      MAX_PROTOCOL_MESSAGE_LENGTH-1000)
@@ -216,6 +233,19 @@ static const unsigned int DEFAULT_CHECKLEVEL = 3;
 // one 128MB block file + added 15% undo data = 147MB greater for a total of 545MB
 // Setting the target to > than 550MB will make it likely we can respect the target.
 static const uint64_t MIN_DISK_SPACE_FOR_BLOCK_FILES = 550 * 1024 * 1024;
+
+/** Block prefetch cache */
+extern bool fBlockPrefetchEnabled;
+extern unsigned int nPrefetchNumThreads;
+extern unsigned int nPrefetchNumBlocks;
+
+extern bool fSkipScanPreFork;
+extern int64_t nForceBirthday;
+
+extern bool fIgnoreSpam;
+extern int nSpamOutputsMin;
+
+extern bool fAsyncNoteDecryption;
 
 /** Register with a network node to receive its signals */
 void RegisterNodeSignals(CNodeSignals& nodeSignals);
@@ -323,6 +353,8 @@ struct CNodeStateStats {
 
 
 CAmount GetMinRelayFee(const CTransaction& tx, unsigned int nBytes, bool fAllowFree);
+
+CAmount PerSaplingOutputFees(const CTransaction& tx);
 
 /**
  * Count ECDSA signature operations the old-fashioned (pre-0.6) way
@@ -456,6 +488,8 @@ bool GetTimestampIndex(unsigned int high, unsigned int low, bool fActiveOnly,
 bool WriteBlockToDisk(const CBlock& block, CDiskBlockPos& pos, const CMessageHeader::MessageStartChars& messageStart);
 bool ReadBlockFromDisk(CBlock& block, const CDiskBlockPos& pos, const Consensus::Params& consensusParams);
 bool ReadBlockFromDisk(CBlock& block, const CBlockIndex* pindex, const Consensus::Params& consensusParams);
+bool ReadBlockFromPrefetch(CBlock& block, const CBlockIndex* pindex, const Consensus::Params& consensusParams);
+void ClearBlockPrefetch();
 
 /** Functions for validating blocks and updating the block tree */
 

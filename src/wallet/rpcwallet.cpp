@@ -2880,6 +2880,9 @@ UniValue zc_benchmark(const UniValue& params, bool fHelp)
         } else if (benchmarktype == "trydecryptsaplingnotes") {
             int nKeys = params[2].get_int();
             sample_times.push_back(benchmark_try_decrypt_sapling_notes(nKeys));
+        } else if (benchmarktype == "tryasyncdecryptsaplingnotes") {
+            int nKeys = params[2].get_int();
+            sample_times.push_back(benchmark_try_async_decrypt_sapling_notes(nKeys));
         } else if (benchmarktype == "incnotewitnesses") {
             int nTxs = params[2].get_int();
             sample_times.push_back(benchmark_increment_sprout_note_witnesses(nTxs));
@@ -4262,6 +4265,16 @@ UniValue z_sendmany(const UniValue& params, bool fHelp)
 
     // Fee in Zatoshis, not currency format)
     CAmount nFee        = DEFAULT_FEE;
+    // adjust fee to comply with per-Sapling-output recomendation (number of Sapling outputs * per-Sapling-output fee)
+    unsigned int nSaplingOutputsCount = tx.vShieldedOutput.size();
+
+    // assume one additional Sapling output for potential change
+    if (fromSapling)
+        nSaplingOutputsCount++;
+
+    CAmount nSaplingOutputsFee = (nSaplingOutputsCount > DEFAULT_EXEMPT_SAPLING_OUTPUTS) ? (nSaplingOutputsCount - DEFAULT_EXEMPT_SAPLING_OUTPUTS) * DEFAULT_PER_SAPLING_OUTPUT_FEE : DEFAULT_PER_SAPLING_OUTPUT_FEE;
+
+    nFee = std::max(nFee, nSaplingOutputsFee);
     CAmount nDefaultFee = nFee;
 
     if (params.size() > 3) {

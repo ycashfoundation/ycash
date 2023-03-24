@@ -52,9 +52,9 @@ extern bool fPayAtLeastCustomFee;
 #ifdef YCASH_WR
 extern bool fTxDeleteEnabled;
 extern bool fTxConflictDeleteEnabled;
-extern int fDeleteInterval;
-extern unsigned int fDeleteTransactionsAfterNBlocks;
-extern unsigned int fKeepLastNTransactions;
+extern int nDeleteInterval;
+extern unsigned int nDeleteTransactionsAfterNBlocks;
+extern unsigned int nKeepLastNTransactions;
 #endif // YCASH_WR
 
 static const unsigned int DEFAULT_KEYPOOL_SIZE = 100;
@@ -85,7 +85,7 @@ static const size_t HD_WALLET_SEED_LENGTH = 32;
 
 #ifdef YCASH_WR
 //Default Transaction Rentention N-BLOCKS
-static const int DEFAULT_TX_DELETE_INTERVAL = 1000;
+static const int DEFAULT_TX_DELETE_INTERVAL = 2000;
 
 //Default Transaction Rentention N-BLOCKS
 static const unsigned int DEFAULT_TX_RETENTION_BLOCKS = 10000;
@@ -261,31 +261,41 @@ public:
     std::list<SproutWitness> witnesses;
 
     /**
-     * Block height corresponding to the most current witness.
+     * The height of the most recently-witnessed block for this note.
      *
-     * When we first create a SproutNoteData in CWallet::FindMySproutNotes, this is set to
-     * -1 as a placeholder. The next time CWallet::ChainTip is called, we can
-     * determine what height the witness cache for this note is valid for (even
-     * if no witnesses were cached), and so can set the correct value in
-     * CWallet::IncrementNoteWitnesses and CWallet::DecrementNoteWitnesses.
+     * Set to -1 if the note is unmined, or if the note was spent long enough
+     * ago that we will never unspend it.
      */
     int witnessHeight;
+
+    /**
+     * (memory only) Block height at which this note was observed to be spent.
+     *
+     * This is used to prune the list of witnesses once we are guaranteed to
+     * never be unspending the note. If the node is restarted in the window
+     * between detecting the spend and pruning the witnesses (or before the
+     * pruning is serialized to disk), then the spentness will likely not be
+     * re-detected until a rescan is performed (meaning that this note's
+     * witnesses will continue to be updated, which is only a performance
+     * rather than a correctness issue).
+     */
+    std::optional<int> spentHeight;
 
 #ifdef YCASH_WR
     //In Memory Only
     bool witnessRootValidated;
 
-    SproutNoteData() : address(), nullifier(), witnessHeight {-1}, witnessRootValidated {false} { }
+    SproutNoteData() : address(), nullifier(), witnessHeight {-1}, spentHeight(), witnessRootValidated {false} { }
     SproutNoteData(libzcash::SproutPaymentAddress a) :
-            address {a}, nullifier(), witnessHeight {-1}, witnessRootValidated {false} { }
+            address {a}, nullifier(), witnessHeight {-1}, spentHeight(), witnessRootValidated {false} { }
     SproutNoteData(libzcash::SproutPaymentAddress a, uint256 n) :
-            address {a}, nullifier {n}, witnessHeight {-1}, witnessRootValidated {false} { }
+            address {a}, nullifier {n}, witnessHeight {-1}, spentHeight(), witnessRootValidated {false} { }
 #else
-    SproutNoteData() : address(), nullifier(), witnessHeight {-1} { }
+    SproutNoteData() : address(), nullifier(), witnessHeight {-1}, spentHeight() { }
     SproutNoteData(libzcash::SproutPaymentAddress a) :
-            address {a}, nullifier(), witnessHeight {-1} { }
+            address {a}, nullifier(), witnessHeight {-1}, spentHeight() { }
     SproutNoteData(libzcash::SproutPaymentAddress a, uint256 n) :
-            address {a}, nullifier {n}, witnessHeight {-1} { }
+            address {a}, nullifier {n}, witnessHeight {-1}, spentHeight() { }
 #endif // YCASH_WR
 
     ADD_SERIALIZE_METHODS;
@@ -320,19 +330,38 @@ public:
      * See the comment in that class for a full description.
      */
 #ifdef YCASH_WR
-    SaplingNoteData() : witnessHeight {-1}, nullifier(), witnessRootValidated {false} { }
+    SaplingNoteData() : witnessHeight {-1}, nullifier(), spentHeight(), witnessRootValidated {false} { }
     SaplingNoteData(libzcash::SaplingIncomingViewingKey ivk) : ivk {ivk}, witnessHeight {-1}, nullifier(), witnessRootValidated {false} { }
     SaplingNoteData(libzcash::SaplingIncomingViewingKey ivk, uint256 n) : ivk {ivk}, witnessHeight {-1}, nullifier(n), witnessRootValidated {false} { }
 #else
-    SaplingNoteData() : witnessHeight {-1}, nullifier() { }
+    SaplingNoteData() : witnessHeight {-1}, nullifier(), spentHeight() { }
     SaplingNoteData(libzcash::SaplingIncomingViewingKey ivk) : ivk {ivk}, witnessHeight {-1}, nullifier() { }
     SaplingNoteData(libzcash::SaplingIncomingViewingKey ivk, uint256 n) : ivk {ivk}, witnessHeight {-1}, nullifier(n) { }
 #endif // YCASH_WR
 
     std::list<SaplingWitness> witnesses;
+    /**
+     * The height of the most recently-witnessed block for this note.
+     *
+     * Set to -1 if the note is unmined, or if the note was spent long enough
+     * ago that we will never unspend it.
+     */
     int witnessHeight;
     libzcash::SaplingIncomingViewingKey ivk;
     std::optional<uint256> nullifier;
+
+    /**
+     * (memory only) Block height at which this note was observed to be spent.
+     *
+     * This is used to prune the list of witnesses once we are guaranteed to
+     * never be unspending the note. If the node is restarted in the window
+     * between detecting the spend and pruning the witnesses (or before the
+     * pruning is serialized to disk), then the spentness will likely not be
+     * re-detected until a rescan is performed (meaning that this note's
+     * witnesses will continue to be updated, which is only a performance
+     * rather than a correctness issue).
+     */
+    std::optional<int> spentHeight;
 
 #ifdef YCASH_WR
     //In Memory Only
@@ -648,13 +677,8 @@ public:
     bool IsTrusted() const;
 
     bool WriteToDisk(CWalletDB *pwalletdb);
-#ifdef YCASH_WR    
-    bool WriteArcSproutOpToDisk(CWalletDB *pwalletdb, uint256 nullifier, JSOutPoint op);
-    bool WriteArcSaplingOpToDisk(CWalletDB *pwalletdb, uint256 nullifier, SaplingOutPoint op);
-#endif // YCASH_WR
 
     int64_t GetTxTime() const;
-    int GetRequestCount() const;
 
     bool RelayWalletTransaction();
 
@@ -877,23 +901,14 @@ public:
 #ifdef YCASH_WR
     int64_t NullifierCount();
     std::set<uint256> GetNullifiers();
-
-    std::map<uint256, ArchiveTxPoint> mapArcTxs;
-    void AddToArcTxs(const uint256& wtxid, const ArchiveTxPoint& ArcTxPt);
-
-    std::map<uint256, JSOutPoint> mapArcJSOutPoints;
-    void AddToArcJSOutPoints(const uint256& nullifier, const JSOutPoint& op);
-
-    std::map<uint256, SaplingOutPoint> mapArcSaplingOutPoints;
-    void AddToArcSaplingOutPoints(const uint256& nullifier, const SaplingOutPoint& op);
 #endif // YCASH_WR
 
 protected:
 #ifdef YCASH_WR
     int SproutWitnessMinimumHeight(const uint256& nullifier, int nWitnessHeight, int nMinimumHeight);
     int SaplingWitnessMinimumHeight(const uint256& nullifier, int nWitnessHeight, int nMinimumHeight);
-    int VerifyAndSetInitialWitness(const CBlockIndex* pindex, bool witnessOnly);
-    void BuildWitnessCache(const CBlockIndex* pindex, bool witnessOnly); 
+    int VerifyAndSetInitialWitness(const CBlockIndex* pindex, bool witnessOnly, const CBlock* pblockIn);
+    void BuildWitnessCache(const CBlockIndex* pindex, bool witnessOnly, const CBlock* pblockIn);
     void DecrementNoteWitnessesWR(const CBlockIndex* pindex);
 #endif // YCASH_WR
     /**
@@ -1085,8 +1100,19 @@ public:
 
     std::map<uint256, CWalletTx> mapWallet;
 
+#ifdef YCASH_WR
+    std::set<uint256> setExWallet;
+    void AddToEx(const uint256& wtxid, bool fFromLoadWallet);
+#endif // YCASH_WR
+
+    std::set<uint256> setSiftedSprout;
+    std::set<uint256> setSiftedSapling;
+    void AddToSifted(const uint256& wtxid);
+#ifdef YCASH_WR
+    void RemoveFromSifted(const uint256& wtxid);
+#endif // YCASH_WR
+
     int64_t nOrderPosNext;
-    std::map<uint256, int> mapRequestCount;
 
     std::map<CTxDestination, CAddressBookData> mapAddressBook;
 
@@ -1294,7 +1320,6 @@ public:
     void UpdateWalletTransactionOrder(std::map<std::pair<int,int>, const uint256> &mapSorted, bool resetOrder);
     unsigned int DeleteTransactions(std::vector<uint256> &removeTxs, std::vector<uint256> &removeExpiredTxs);
     void DeleteWalletTransactions(const CBlockIndex* pindex);
-    bool initalizeArcTx();
 #endif // YCASH_WR
     int ScanForWalletTransactions(CBlockIndex* pindexStart, bool fUpdate = false);
     void ReacceptWalletTransactions();
@@ -1355,6 +1380,7 @@ public:
         uint8_t n) const;
     mapSproutNoteData_t FindMySproutNotes(const CTransaction& tx) const;
     std::pair<mapSaplingNoteData_t, SaplingIncomingViewingKeyMap> FindMySaplingNotes(const CTransaction& tx, int height) const;
+    std::pair<mapSaplingNoteData_t, SaplingIncomingViewingKeyMap> FindMySaplingNotesAsync(const CTransaction& tx, int height) const;
     bool IsSproutNullifierFromMe(const uint256& nullifier) const;
     bool IsSaplingNullifierFromMe(const uint256& nullifier) const;
 
@@ -1404,23 +1430,8 @@ public:
 
     void UpdatedTransaction(const uint256 &hashTx);
 
-    void Inventory(const uint256 &hash)
-    {
-        {
-            LOCK(cs_wallet);
-            std::map<uint256, int>::iterator mi = mapRequestCount.find(hash);
-            if (mi != mapRequestCount.end())
-                (*mi).second++;
-        }
-    }
-
     void GetAddressForMining(MinerAddress &minerAddress);
-    void ResetRequestCount(const uint256 &hash)
-    {
-        LOCK(cs_wallet);
-        mapRequestCount[hash] = 0;
-    };
-    
+
     unsigned int GetKeyPoolSize()
     {
         AssertLockHeld(cs_wallet); // setKeyPool

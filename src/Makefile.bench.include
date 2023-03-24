@@ -36,8 +36,8 @@ bench_bench_bitcoin_LDADD = \
   $(LIBMEMENV) \
   $(LIBSECP256K1) \
   $(LIBUNIVALUE) \
-  $(LIBZCASH) \
-  $(LIBRUSTZCASH)
+  $(LIBRUSTZCASH) \
+  $(LIBZCASH)
 
 if ENABLE_ZMQ
 bench_bench_bitcoin_LDADD += $(LIBBITCOIN_ZMQ) $(ZMQ_LIBS)

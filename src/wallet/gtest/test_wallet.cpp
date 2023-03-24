@@ -58,8 +58,12 @@ public:
 #ifndef YCASH_WR
 
 #else
-    void BuildWitnessCache(const CBlockIndex* pindex, bool witnessOnly) {
-        CWallet::BuildWitnessCache(pindex, witnessOnly);
+    void BuildWitnessCache(const CBlockIndex* pindex, bool witnessOnly, const CBlock* pblockIn) {
+        CWallet::BuildWitnessCache(pindex, witnessOnly, pblockIn);
+    }
+
+    void DecrementNoteWitnessesWR(const CBlockIndex* pindex) {
+        CWallet::DecrementNoteWitnessesWR(pindex);
     }
 #endif // YCASH_WR
     void DecrementNoteWitnesses(const CBlockIndex* pindex) {
@@ -1260,6 +1264,7 @@ TEST(WalletTests, SpentSaplingNoteIsFromMe) {
 }
 
 TEST(WalletTests, CachedWitnessesEmptyChain) {
+    SelectParams(CBaseChainParams::REGTEST);
     TestWallet wallet;
 
     auto sk = libzcash::SproutSpendingKey::random();
@@ -1313,9 +1318,13 @@ TEST(WalletTests, CachedWitnessesEmptyChain) {
     EXPECT_TRUE((bool) sproutWitnesses[1]);
     EXPECT_TRUE((bool) saplingWitnesses[0]);
 
+#ifndef YCASH_WR
     // Until #1302 is implemented, this should triggger an assertion
     EXPECT_DEATH(wallet.DecrementNoteWitnesses(&index),
                  ".*nWitnessCacheSize > 0.*") << __FILE__ << __LINE__;
+#else
+    EXPECT_NO_THROW(wallet.DecrementNoteWitnessesWR(&index)) << __FILE__ << __LINE__;
+#endif // YCASH_WR
 }
 
 TEST(WalletTests, CachedWitnessesChainTip) {

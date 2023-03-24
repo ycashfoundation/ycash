@@ -179,7 +179,6 @@ CDBEnv::VerifyResult CDBEnv::Verify(const std::string& strFile, bool (*recoverFu
     return (fRecovered ? RECOVER_OK : RECOVER_FAIL);
 }
 
-#ifdef YCASH_WR
 bool CDBEnv::Compact(const std::string& strFile)
 {
     LOCK(cs_db);
@@ -228,7 +227,6 @@ bool CDBEnv::Compact(const std::string& strFile)
     }
     return (result == 0);
 }
-#endif // YCASH_WR
 
 bool CDBEnv::Salvage(const std::string& strFile, bool fAggressive, std::vector<CDBEnv::KeyValPair>& vResult)
 {

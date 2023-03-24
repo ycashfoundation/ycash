@@ -12,6 +12,7 @@
 #ifdef ENABLE_MINING
 #include "crypto/equihash.h"
 #endif
+#include "crypto/sha256.h"
 #include "fs.h"
 #include "key.h"
 #include "main.h"
@@ -71,6 +72,7 @@ JoinSplitTestingSetup::~JoinSplitTestingSetup()
 BasicTestingSetup::BasicTestingSetup(const std::string& chainName)
 {
     assert(sodium_init() != -1);
+    SHA256AutoDetect();
     ECC_Start();
     SetupEnvironment();
     SetupNetworking();
