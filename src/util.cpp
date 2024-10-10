@@ -359,11 +359,7 @@ void ClearDatadirCache()
 
 fs::path GetConfigFile(const std::string& confPath)
 {
-    fs::path pathConfigFile(confPath);
-    if (!pathConfigFile.is_complete())
-        pathConfigFile = GetDataDir(false) / pathConfigFile;
-
-    return pathConfigFile;
+    return fs::absolute(fs::path(confPath), GetDataDir(false));
 }
 
 void ReadConfigFile(const std::string& confPath,
@@ -426,9 +422,7 @@ void ReadConfigFile(const std::string& confPath,
 #ifndef WIN32
 fs::path GetPidFile()
 {
-    fs::path pathPidFile(GetArg("-pid", BITCOIN_PID_FILENAME));
-    if (!pathPidFile.is_complete()) pathPidFile = GetDataDir() / pathPidFile;
-    return pathPidFile;
+    return fs::absolute(fs::path(GetArg("-pid", BITCOIN_PID_FILENAME)), GetDataDir(true));
 }
 
 void CreatePidFile(const fs::path &path, pid_t pid)
