@@ -74,6 +74,7 @@ src/univalue/gen
 
 # Compilation
 Makefile
+configure~
 
 # Rust
 .cargo/.configured-for-*

@@ -1,9 +1,10 @@
 package=boost
-$(package)_version=1_79_0
+$(package)_version=1_83_0
 $(package)_download_path=https://boostorg.jfrog.io/artifactory/main/release/$(subst _,.,$($(package)_version))/source
 $(package)_file_name=boost_$($(package)_version).tar.bz2
-$(package)_sha256_hash=475d589d51a7f8b3ba2ba4eda022b170e562ca3b760ee922c146b6c65856ef39
+$(package)_sha256_hash=6478edfe2f3305127cffe8caf73ea0176c53769f4bf1585be237eb30798c3b8e
 $(package)_dependencies=native_b2
+$(package)_patches=6753-signals2-function-fix.patch
 
 ifneq ($(YCASH_TOOLCHAIN), GCC)
   ifneq ($(host_os),darwin)
@@ -26,7 +27,11 @@ $(package)_config_opts_aarch64=address-model=64
 $(package)_config_opts_armv7a=address-model=32
 
 ifneq ($(YCASH_TOOLCHAIN), GCC)
-  $(package)_toolset_$(host_os)=clang
+  ifneq (,$(findstring clang,$($(package)_cxx)))
+    $(package)_toolset_$(host_os)=clang
+  else
+    $(package)_toolset_$(host_os)=gcc
+  endif
 else
   $(package)_toolset_$(host_os)=gcc
 endif
@@ -47,11 +52,12 @@ endif
 endef
 
 define $(package)_preprocess_cmds
+  patch -p1 < $($(package)_patch_dir)/6753-signals2-function-fix.patch && \
   echo "using $($(package)_toolset_$(host_os)) : : $($(package)_cxx) : <cflags>\"$($(package)_cflags)\" <cxxflags>\"$($(package)_cxxflags)\" <compileflags>\"$($(package)_cppflags)\" <linkflags>\"$($(package)_ldflags)\" <archiver>\"$($(package)_ar)\" <striper>\"$(host_STRIP)\"  <ranlib>\"$(host_RANLIB)\" <rc>\"$(host_WINDRES)\" : ;" > user-config.jam
 endef
 
 define $(package)_config_cmds
-  ./bootstrap.sh --without-icu --with-libraries=$($(package)_config_libraries) --with-toolset=$($(package)_toolset_$(host_os)) --with-bjam=b2
+  ./bootstrap.sh --without-icu --with-libraries=$($(package)_config_libraries) --with-toolset=$($(package)_toolset_$(host_os)) --with-bjam=b2 --libdir=lib
 endef
 
 define $(package)_build_cmds

@@ -4485,20 +4485,22 @@ bool ContextualCheckBlock(
             }
         }
     } else {
-        // After YCash fork, the founders reward is 5% in perpetuity
-        bool found = false;
+        // After YCash fork, the founders reward is 5% until the height of YDF reward mandate end
+        if (nHeight < chainparams.GetYdfMandateEndHeight()) {
+            bool found = false;
 
-        for (const CTxOut& output : block.vtx[0].vout) {
-            if (output.scriptPubKey == chainparams.GetFoundersRewardScriptAtHeight(nHeight)) {
-                if (output.nValue == (GetBlockSubsidy(nHeight, consensusParams) / 20)) {
-                    found = true;
-                    break;
+            for (const CTxOut& output : block.vtx[0].vout) {
+                if (output.scriptPubKey == chainparams.GetFoundersRewardScriptAtHeight(nHeight)) {
+                    if (output.nValue == (GetBlockSubsidy(nHeight, consensusParams) / 20)) {
+                        found = true;
+                        break;
+                    }
                 }
             }
-        }
 
-        if (!found) {
-            return state.DoS(100, error("%s: YCash reward missing", __func__), REJECT_INVALID, "cb-no-founders-reward");
+            if (!found) {
+                return state.DoS(100, error("%s: YCash reward missing", __func__), REJECT_INVALID, "cb-no-founders-reward");
+            }
         }
     }
 

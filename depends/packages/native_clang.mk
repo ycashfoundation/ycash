@@ -5,27 +5,44 @@ package=native_clang
 # - Manually fix the versions for packages that don't exist (the LLVM project
 #   doesn't uniformly cut binaries across releases).
 # The Clang compiler should use the same LLVM version as the Rust compiler.
-$(package)_major_version=14
-$(package)_version=14.0.6
-$(package)_download_path=https://github.com/llvm/llvm-project/releases/download/llvmorg-$($(package)_version)
-$(package)_download_path_linux=https://github.com/llvm/llvm-project/releases/download/llvmorg-14.0.0
-$(package)_download_file_linux=clang+llvm-14.0.0-x86_64-linux-gnu-ubuntu-18.04.tar.xz
+$(package)_default_major_version=18
+$(package)_default_version=18.1.8
+# 2024-05-03: No Intel macOS packages are available for Clang 16, 17, or 18.
+$(package)_major_version_darwin=15
+$(package)_version_darwin=15.0.4
+# 2023-02-16: No FreeBSD packages are available for Clang 15.
+# 2023-04-07: Still the case.
+# 2024-05-03: No FreeBSD packages are available for Clang 17 or 18.
+#             Clang 16 has FreeBSD 13 packages, but none for FreeBSD 12.
+$(package)_major_version_freebsd=14
+$(package)_version_freebsd=14.0.6
+
+# Tolerate split LLVM versions. If an LLVM build is not available for a Tier 3
+# platform, we permit an older LLVM version to be used. This means the version
+# of LLVM used in Clang and Rust will differ on these platforms, preventing LTO
+# from working.
+$(package)_version=$(if $($(package)_version_$(host_arch)_$(host_os)),$($(package)_version_$(host_arch)_$(host_os)),$(if $($(package)_version_$(host_os)),$($(package)_version_$(host_os)),$($(package)_default_version)))
+$(package)_major_version=$(if $($(package)_major_version_$(host_arch)_$(host_os)),$($(package)_major_version_$(host_arch)_$(host_os)),$(if $($(package)_major_version_$(host_os)),$($(package)_major_version_$(host_os)),$($(package)_default_major_version)))
+
+$(package)_download_path_linux=https://github.com/llvm/llvm-project/releases/download/llvmorg-$($(package)_version)
+$(package)_download_file_linux=clang+llvm-$($(package)_version)-x86_64-linux-gnu-ubuntu-18.04.tar.xz
 $(package)_file_name_linux=clang-llvm-$($(package)_version)-x86_64-linux-gnu-ubuntu-18.04.tar.xz
-$(package)_sha256_hash_linux=61582215dafafb7b576ea30cc136be92c877ba1f1c31ddbbd372d6d65622fef5
+$(package)_sha256_hash_linux=54ec30358afcc9fb8aa74307db3046f5187f9fb89fb37064cdde906e062ebf36
 $(package)_download_path_darwin=https://github.com/llvm/llvm-project/releases/download/llvmorg-$($(package)_version)
 $(package)_download_file_darwin=clang+llvm-$($(package)_version)-x86_64-apple-darwin.tar.xz
 $(package)_file_name_darwin=clang-llvm-$($(package)_version)-x86_64-apple-darwin.tar.xz
-$(package)_sha256_hash_darwin=e6cc6b8279661fd4452c2847cb8e55ce1e54e1faf4ab497b37c85ffdb6685e7c
+$(package)_sha256_hash_darwin=4c98d891c07c8f6661b233bf6652981f28432cfdbd6f07181114195c3536544b
 $(package)_download_path_freebsd=https://github.com/llvm/llvm-project/releases/download/llvmorg-$($(package)_version)
 $(package)_download_file_freebsd=clang+llvm-$($(package)_version)-amd64-unknown-freebsd12.tar.xz
 $(package)_file_name_freebsd=clang-llvm-$($(package)_version)-amd64-unknown-freebsd12.tar.xz
 $(package)_sha256_hash_freebsd=b0a7b86dacb12afb8dd2ca99ea1b894d9cce84aab7711cb1964b3005dfb09af3
+$(package)_download_path_aarch64_linux=https://github.com/llvm/llvm-project/releases/download/llvmorg-$($(package)_version)
 $(package)_download_file_aarch64_linux=clang+llvm-$($(package)_version)-aarch64-linux-gnu.tar.xz
 $(package)_file_name_aarch64_linux=clang-llvm-$($(package)_version)-aarch64-linux-gnu.tar.xz
-$(package)_sha256_hash_aarch64_linux=1a81fda984f5e607584916fdf69cf41e5385b219b983544d2c1a14950d5a65cf
+$(package)_sha256_hash_aarch64_linux=dcaa1bebbfbb86953fdfbdc7f938800229f75ad26c5c9375ef242edad737d999
 
-ifneq (,$(wildcard /etc/arch-release))
-$(package)_dependencies=native_libtinfo
+ifeq ($(build_os),linux)
+$(package)_dependencies=native_libtinfo5
 endif
 
 # Ensure we have clang native to the builder, not the target host
@@ -38,6 +55,11 @@ endif
 
 define $(package)_stage_cmds
   mkdir -p $($(package)_staging_prefix_dir)/bin && \
+  rm -r include/flang && \
+  rm -r include/lldb && \
+  rm lib/libflang* && \
+  rm lib/libFortran* && \
+  rm lib/liblldb* && \
   cp bin/clang-$($(package)_major_version) $($(package)_staging_prefix_dir)/bin && \
   cp bin/lld $($(package)_staging_prefix_dir)/bin && \
   cp bin/llvm-ar $($(package)_staging_prefix_dir)/bin && \

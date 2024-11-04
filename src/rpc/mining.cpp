@@ -726,11 +726,12 @@ UniValue getblocktemplate(const UniValue& params, bool fHelp)
         entry.pushKV("sigops", pblocktemplate->vTxSigOps[index_in_template]);
 
         if (tx.IsCoinBase()) {
-            // Show founders' reward (forever active, so required)
+            // Show founders' reward (optional after YDF mandate end height)
             auto nextHeight = pindexPrev->nHeight + 1;
-            entry.pushKV("foundersreward", (int64_t)tx.vout[1].nValue);
+            entry.pushKV("ydfpercentage", nextHeight < Params().GetYdfMandateEndHeight() ? 5 : GetArg("-ydf", DEFAULT_YDF_FEE_PERCENTAGE));
+            entry.pushKV("foundersreward", tx.vout.size() > 1 ? (int64_t)tx.vout[1].nValue : 0);
             entry.pushKV("foundersaddress", Params().GetFoundersRewardAddressAtHeight(nextHeight));
-            entry.pushKV("required", true);
+            entry.pushKV("required", nextHeight < Params().GetYdfMandateEndHeight());
             txCoinbase = entry;
         } else {
             transactions.push_back(entry);
@@ -970,7 +971,12 @@ UniValue getblocksubsidy(const UniValue& params, bool fHelp)
             nFoundersReward = nMinerReward / 5; // 20% to Zcash founders
         }
     } else {
-        nFoundersReward = nMinerReward / 20;   // 5% to Ycash founders
+        if (nHeight < Params().GetYdfMandateEndHeight()) {
+            nFoundersReward = nMinerReward / 20;   // 5% to Ycash founders
+        } else {
+            unsigned int nYdfFeePercentage = GetArg("-ydf", DEFAULT_YDF_FEE_PERCENTAGE);
+            nFoundersReward = nMinerReward * nYdfFeePercentage / 100;   // optional percentage to Ycash founders, or none at all (ydf=0 in ycash.conf)  
+        }
     }
 
     nMinerReward -= nFoundersReward;
