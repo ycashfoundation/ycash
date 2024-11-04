@@ -95,6 +95,7 @@ public:
     CScript GetFoundersRewardScriptAtHeight(int height) const;
     std::string GetZcashFoundersRewardAddressAtIndex(int i) const;
     std::string GetYcashFoundersRewardAddressAtIndex(int i) const;
+    int GetYdfMandateEndHeight() const { return nYdfMandateEndHeight; }
     /** Enforce coinbase consensus rule in regtest mode */
     void SetRegTestCoinbaseMustBeShielded() { consensus.fCoinbaseMustBeShielded = true; }
 protected:
@@ -121,6 +122,7 @@ protected:
     CCheckpointData checkpointData;
     std::vector<std::string> vFoundersRewardAddress;
     std::vector<std::string> vYcashFoundersRewardAddress;
+    int nYdfMandateEndHeight = 0;
 
     CAmount nSproutValuePoolCheckpointHeight = 0;
     CAmount nSproutValuePoolCheckpointBalance = 0;

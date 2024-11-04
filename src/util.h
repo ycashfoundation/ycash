@@ -148,6 +148,15 @@ bool SoftSetArg(const std::string& strArg, const std::string& strValue);
 bool SoftSetBoolArg(const std::string& strArg, bool fValue);
 
 /**
+ * Force set an argument
+ *
+ * @param strArg Argument to set (e.g. "-foo")
+ * @param strValue Value (e.g. "1")
+ * @return true
+ */
+bool SoftForceArg(const std::string& strArg, const std::string& strValue);
+
+/**
  * Format a string to be used as group of options in help messages
  *
  * @param message Group name (e.g. "RPC server options:")

@@ -6,6 +6,10 @@ else
   native_packages := native_ccache native_rust
 endif
 
+ifeq ($(build_os),linux)
+native_packages += native_libtinfo5
+endif
+
 wallet_packages=bdb
 
 $(host_arch)_$(host_os)_native_packages += native_b2

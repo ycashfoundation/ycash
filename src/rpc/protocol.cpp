@@ -70,9 +70,7 @@ static const std::string COOKIEAUTH_FILE = ".cookie";
 
 fs::path GetAuthCookieFile()
 {
-    fs::path path(GetArg("-rpccookiefile", COOKIEAUTH_FILE));
-    if (!path.is_complete()) path = GetDataDir() / path;
-    return path;
+    return fs::absolute(fs::path(GetArg("-rpccookiefile", COOKIEAUTH_FILE)), GetDataDir(true));
 }
 
 bool GenerateAuthCookie(std::string *cookie_out)

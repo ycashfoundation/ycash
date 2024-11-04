@@ -185,6 +185,8 @@ public:
         auto block_subsidy = GetBlockSubsidy(nHeight, chainparams.GetConsensus());
         auto miner_reward = block_subsidy; // founders' reward or funding stream amounts will be subtracted below
 
+        unsigned int nYdfFeePercentage = GetArg("-ydf", DEFAULT_YDF_FEE_PERCENTAGE);
+
         if (nHeight > 0) {
             if (!chainparams.GetConsensus().NetworkUpgradeActive(nHeight, Consensus::UPGRADE_YCASH)) {
                 if (nHeight <= chainparams.GetConsensus().GetLastFoundersRewardBlockHeight(nHeight)) {
@@ -196,12 +198,23 @@ public:
                     mtx.vout.push_back(CTxOut(vFoundersReward, chainparams.GetFoundersRewardScriptAtHeight(nHeight)));
                 }
             } else {
-                // Founders reward is 5% of the block subsidy
-                auto vFoundersReward = miner_reward / 20;
-                // Take some reward away from us
-                miner_reward -= vFoundersReward;
-                // And give it to the founders
-                mtx.vout.push_back(CTxOut(vFoundersReward, chainparams.GetFoundersRewardScriptAtHeight(nHeight)));
+                CAmount vFoundersReward = 0;
+                // check for YDF fee mandate height
+                if (nHeight < chainparams.GetYdfMandateEndHeight()) {
+                    // Founders reward is 5% of the block subsidy
+                    vFoundersReward = miner_reward / 20;
+                } else {
+                    // Founders reward is optional
+                    vFoundersReward = miner_reward * nYdfFeePercentage / 100;
+                }
+
+                // If miner sets ydf=0 in conf, coinbase tx created by his node has one output = full coinbase reward amount goes to miner
+                if (vFoundersReward > 0) {
+                    // Take some reward away from us
+                    miner_reward -= vFoundersReward;
+                    // And give it to the founders
+                    mtx.vout.push_back(CTxOut(vFoundersReward, chainparams.GetFoundersRewardScriptAtHeight(nHeight)));
+                }
             }
 
             // potential Funding Streams should also be deducted from remaining miner reward (as of Canopy activation)
