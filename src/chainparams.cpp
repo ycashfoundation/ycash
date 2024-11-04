@@ -142,6 +142,9 @@ public:
 
         consensus.nFundingPeriodLength = consensus.nPostBlossomSubsidyHalvingInterval / 48;
 
+        nYdfMandateEndHeight = 2275000;
+        assert(nYdfMandateEndHeight >= consensus.vUpgrades[Consensus::UPGRADE_YCASH].nActivationHeight);
+
         // guarantees the first 2 characters, when base58 encoded, are "s1"
         keyConstants.base58Prefixes[PUBKEY_ADDRESS]     = {0x1C,0x28};
         // guarantees the first 2 characters, when base58 encoded, are "s3"
@@ -188,7 +191,7 @@ public:
         keyConstants.bech32HRPs[LEGACY_SAPLING_EXTENDED_FVK]         = "zxviews";
 
         // The best chain should have at least this much work.
-        consensus.nMinimumChainWork = uint256S("0000000000000000000000000000000000000000000000000152d757e1a355cb");
+        consensus.nMinimumChainWork = uint256S("0000000000000000000000000000000000000000000000000152d8660f9d781c");
 
         /**
          * The message start string should be awesome! ⓩ❤
@@ -240,11 +243,11 @@ public:
             (572760, uint256S("0x00000008db657f58222e38e354c18ccbb6c74cf525ef4f3a95f0f8a324a3166d"))
             (980000, uint256S("0x00000510ccc6bae2ddb38b9313ffb9686397f6cd0dee243462baeaf8911d0791"))
             (1035353, uint256S("0x00000543378a75f173914390c672838c9fbd9dc86ae647ffae18ed6b626edb30"))
-            (1575000, uint256S("0x000002b856230b06caa3412058e6490fab256cee9d9d9fb68eae59b4ebd94471")),
-            1679411052,     // * UNIX timestamp of last checkpoint block
-            6865774,        // * total number of transactions between genesis and last checkpoint
-            3400            // * estimated number of transactions per day after checkpoint
-                            //   total number of tx / (checkpoint block height / (24 * 24))
+            (1575000, uint256S("0x000002b856230b06caa3412058e6490fab256cee9d9d9fb68eae59b4ebd94471"))
+            (2250000, uint256S("0x000003f98b7497fdcd8a6b6d10a93a887c5d47127e24a9dc3a40cb65754d21e7")),
+            1730387360,     // * UNIX timestamp of last checkpoint block
+            7824969,        // * total number of transactions between genesis and last checkpoint
+            1700            // * estimated number of transactions per day after checkpoint
         };
 
         // Hardcoded fallback value for the Sprout shielded value pool balance
@@ -397,6 +400,9 @@ public:
             Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT;
 
         consensus.nFundingPeriodLength = consensus.nPostBlossomSubsidyHalvingInterval / 48;
+
+        nYdfMandateEndHeight = 2000000;
+        assert(nYdfMandateEndHeight >= consensus.vUpgrades[Consensus::UPGRADE_YCASH].nActivationHeight);
 
         // guarantees the first 2 characters, when base58 encoded, are "sm"
         keyConstants.base58Prefixes[PUBKEY_ADDRESS]     = {0x1C,0x95};
@@ -598,6 +604,9 @@ public:
 
         consensus.nFundingPeriodLength = consensus.nPostBlossomSubsidyHalvingInterval / 48;
         // Defined funding streams can be enabled with node config flags.
+
+        nYdfMandateEndHeight = 5;
+        assert(nYdfMandateEndHeight >= consensus.vUpgrades[Consensus::UPGRADE_YCASH].nActivationHeight);
 
         // These prefixes are the same as the testnet prefixes
         keyConstants.base58Prefixes[PUBKEY_ADDRESS]     = {0x1C,0x95};
