@@ -142,6 +142,9 @@ public:
 
         consensus.nFundingPeriodLength = consensus.nPostBlossomSubsidyHalvingInterval / 48;
 
+        nYdfMandateEndHeight = 2275000;
+        assert(nYdfMandateEndHeight >= consensus.vUpgrades[Consensus::UPGRADE_YCASH].nActivationHeight);
+
         // guarantees the first 2 characters, when base58 encoded, are "s1"
         keyConstants.base58Prefixes[PUBKEY_ADDRESS]     = {0x1C,0x28};
         // guarantees the first 2 characters, when base58 encoded, are "s3"
@@ -398,6 +401,9 @@ public:
 
         consensus.nFundingPeriodLength = consensus.nPostBlossomSubsidyHalvingInterval / 48;
 
+        nYdfMandateEndHeight = 2000000;
+        assert(nYdfMandateEndHeight >= consensus.vUpgrades[Consensus::UPGRADE_YCASH].nActivationHeight);
+
         // guarantees the first 2 characters, when base58 encoded, are "sm"
         keyConstants.base58Prefixes[PUBKEY_ADDRESS]     = {0x1C,0x95};
         // guarantees the first 2 characters, when base58 encoded, are "t2"
@@ -598,6 +604,9 @@ public:
 
         consensus.nFundingPeriodLength = consensus.nPostBlossomSubsidyHalvingInterval / 48;
         // Defined funding streams can be enabled with node config flags.
+
+        nYdfMandateEndHeight = 5;
+        assert(nYdfMandateEndHeight >= consensus.vUpgrades[Consensus::UPGRADE_YCASH].nActivationHeight);
 
         // These prefixes are the same as the testnet prefixes
         keyConstants.base58Prefixes[PUBKEY_ADDRESS]     = {0x1C,0x95};

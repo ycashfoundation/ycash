@@ -34,6 +34,10 @@ static const int COINBASE_MATURITY = 100;
 static constexpr uint32_t TX_EXPIRY_HEIGHT_THRESHOLD = 500000000;
 /** The number of blocks after Canopy activation after which v1 plaintexts will be rejected */
 static const unsigned int ZIP212_GRACE_PERIOD = 3;
+/** The maximum allowed YDF fee percentage after it becomes optional */
+static const unsigned int MAX_YDF_FEE_PERCENTAGE = 5;
+/** Default for -ydf **/
+static const unsigned int DEFAULT_YDF_FEE_PERCENTAGE = MAX_YDF_FEE_PERCENTAGE;
 
 /** Flags for LockTime() */
 enum {

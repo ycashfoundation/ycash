@@ -523,6 +523,7 @@ std::string HelpMessage(HelpMessageMode mode)
     strUsage += HelpMessageOpt("-blockminsize=<n>", strprintf(_("Set minimum block size in bytes (default: %u)"), DEFAULT_BLOCK_MIN_SIZE));
     strUsage += HelpMessageOpt("-blockmaxsize=<n>", strprintf(_("Set maximum block size in bytes (default: %d)"), DEFAULT_BLOCK_MAX_SIZE));
     strUsage += HelpMessageOpt("-blockprioritysize=<n>", strprintf(_("Set maximum size of high-priority/low-fee transactions in bytes (default: %d)"), DEFAULT_BLOCK_PRIORITY_SIZE));
+    strUsage += HelpMessageOpt("-ydf=<n>", strprintf(_("Set optional YDF fee in percents (integer in range 0-100; default: %u)"), DEFAULT_YDF_FEE_PERCENTAGE));
     if (GetBoolArg("-help-debug", false))
         strUsage += HelpMessageOpt("-blockversion=<n>", strprintf("Override block version to test forking scenarios (default: %d)", (int)CBlock::CURRENT_VERSION));
 
@@ -874,6 +875,15 @@ void InitParameterInteraction()
     if (GetBoolArg("-whitelistforcerelay", DEFAULT_WHITELISTFORCERELAY)) {
         if (SoftSetBoolArg("-whitelistrelay", true))
             LogPrintf("%s: parameter interaction: -whitelistforcerelay=1 -> setting -whitelistrelay=1\n", __func__);
+    }
+
+    // Make sure optional ydf percentage is in range 0 - 100
+    if (mapArgs.count("-ydf")) {
+        if (GetArg("-ydf", DEFAULT_YDF_FEE_PERCENTAGE) < 0 || GetArg("-ydf", DEFAULT_YDF_FEE_PERCENTAGE) > 100) {
+            if (SoftForceArg("-ydf", std::to_string(DEFAULT_YDF_FEE_PERCENTAGE))) {
+                LogPrintf("%s: parameter validation: invalid -ydf setting detected, forced to default %i %%\n", __func__, DEFAULT_YDF_FEE_PERCENTAGE);
+            }
+        }
     }
 }
 
