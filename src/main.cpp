@@ -1813,8 +1813,11 @@ bool GetSpentIndex(CSpentIndexKey &key, CSpentIndexValue &value)
     if (mempool.getSpentIndex(key, value))
         return true;
 
-    if (!pblocktree->ReadSpentIndex(key, value))
-        return error("Unable to get spent index information");
+    if (!pblocktree->ReadSpentIndex(key, value)) {
+        // This should not be considered an error and should not spam the log, but simply means that a particular output has not yet been spent. 
+        // return error("Unable to get spent index information");
+        return false;
+    }
 
     return true;
 }
