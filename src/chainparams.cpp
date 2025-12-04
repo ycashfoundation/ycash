@@ -401,7 +401,8 @@ public:
 
         consensus.nFundingPeriodLength = consensus.nPostBlossomSubsidyHalvingInterval / 48;
 
-        nYdfMandateEndHeight = 2000000;
+        //nYdfMandateEndHeight = 2000000; // original v4.4.4
+        nYdfMandateEndHeight = 900000; // v4.4.4-1 for testnet
         assert(nYdfMandateEndHeight >= consensus.vUpgrades[Consensus::UPGRADE_YCASH].nActivationHeight);
 
         // guarantees the first 2 characters, when base58 encoded, are "sm"

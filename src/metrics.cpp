@@ -469,6 +469,7 @@ int printMetrics(size_t cols, bool mining)
         int orphaned = 0;
         CAmount immature {0};
         CAmount mature {0};
+        unsigned int nYdfFeePercentage = GetArg("-ydf", DEFAULT_YDF_FEE_PERCENTAGE);
         {
             LOCK2(cs_main, cs_metrics);
             boost::strict_lock_ptr<std::list<uint256>> u = trackedBlocks.synchronize();
@@ -488,7 +489,16 @@ int printMetrics(size_t cols, bool mining)
                             subsidy -= subsidy/5;
                         }
                     } else {
-                        subsidy -= subsidy/20;
+                        CAmount vFoundersReward = 0;
+                        if (height < Params().GetYdfMandateEndHeight()) {
+                            // Founders reward is 5% of the block subsidy
+                            vFoundersReward = subsidy / 20;
+                        } else {
+                            // Founders reward is optional
+                            vFoundersReward = subsidy * nYdfFeePercentage / 100;
+                        }
+
+                        subsidy -= vFoundersReward;
                     }
                     if (std::max(0, COINBASE_MATURITY - (tipHeight - height)) > 0) {
                         immature += subsidy;
