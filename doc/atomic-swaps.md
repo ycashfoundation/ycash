@@ -313,6 +313,79 @@ getswapsecret "swapid"
 ycash-cli getswapsecret "abc123...:0"
 ```
 
+### `deleteswap`
+
+Delete an atomic swap from the wallet database. **WARNING: This action cannot be undone!**
+
+**Syntax:**
+```
+deleteswap "swapid"
+```
+
+**Arguments:**
+- `swapid` (string, required): The swap ID in format "txid:vout"
+
+**Returns:**
+```json
+{
+  "deleted": true,              // Whether the swap was deleted
+  "swapId": "txid:vout"         // The deleted swap ID
+}
+```
+
+**Example:**
+```bash
+ycash-cli deleteswap "abc123...:0"
+```
+
+### `monitorswap`
+
+Monitor an atomic swap for claim or refund transactions. Returns detailed information about the swap's current status, expiry time, and any spend transaction.
+
+**Syntax:**
+```
+monitorswap "swapid"
+```
+
+**Arguments:**
+- `swapid` (string, required): The swap ID in format "txid:vout"
+
+**Returns:**
+```json
+{
+  "swapId": "txid:vout",                  // The swap ID
+  "status": "...",                        // Current status
+  "contractTxid": "hex",                  // Contract transaction ID
+  "contractVout": n,                      // Output index
+  "amount": n.nnn,                        // Amount locked in YEC
+  "secretHash": "hex",                    // The HASH160 of the secret
+  "locktime": n,                          // Refund locktime (block height or timestamp)
+  "locktimeFormatted": "...",             // Human-readable locktime (if Unix timestamp)
+  "locktimeReached": true|false,          // Whether locktime has expired
+  "timeUntilExpiry": "...",               // Human-readable time until expiry (for active swaps)
+  "secondsUntilExpiry": n,                // Seconds until expiry (for active swaps)
+  "spendTxid": "hex",                     // Spend transaction ID (if spent)
+  "spendStatus": "...",                   // Spend status ("confirmed" or "pending in mempool")
+  "spendConfirmed": true|false,           // Whether spend is confirmed
+  "spendBlockHeight": n,                  // Block height of spend (if confirmed)
+  "spendBlockTimeFormatted": "...",       // Human-readable spend time (if confirmed)
+  "isExpired": true|false,                // Whether swap has expired
+  "requiresAction": true|false            // Whether swap requires user action
+}
+```
+
+**Example:**
+```bash
+ycash-cli monitorswap "abc123...:0"
+```
+
+**Use Cases:**
+- Check if a swap has expired and can be refunded
+- Monitor if a counterparty has claimed or refunded their swap
+- Get time remaining until locktime expires
+- Verify spend transaction status (confirmed or pending)
+- Determine if action is required (e.g., refund or claim available)
+
 ## Cross-Chain Atomic Swap Protocol
 
 Here's how to perform an atomic swap between Ycash and another cryptocurrency (e.g., Bitcoin):

@@ -1467,6 +1467,264 @@ UniValue getswapsecret(const UniValue& params, bool fHelp)
     return result;
 }
 
+/**
+ * deleteswap "swapid"
+ *
+ * Delete an atomic swap from the wallet database.
+ * This removes the swap record permanently and cannot be undone.
+ *
+ * Arguments:
+ * 1. swapid  (string, required) The swap ID in format "txid:vout"
+ *
+ * Result:
+ * {
+ *   "deleted": true                (boolean) Whether the swap was deleted
+ *   "swapId": "txid:vout"           (string) The deleted swap ID
+ * }
+ */
+UniValue deleteswap(const UniValue& params, bool fHelp)
+{
+    if (!EnsureWalletIsAvailable(fHelp))
+        return NullUniValue;
+
+    if (fHelp || params.size() != 1)
+        throw runtime_error(
+            "deleteswap \"swapid\"\n"
+            "\nDelete an atomic swap from the wallet database.\n"
+            "WARNING: This action cannot be undone!\n"
+            "\nArguments:\n"
+            "1. \"swapid\"  (string, required) The swap ID in format \"txid:vout\"\n"
+            "\nResult:\n"
+            "{\n"
+            "  \"deleted\": true,          (boolean) Whether the swap was deleted\n"
+            "  \"swapId\": \"txid:vout\"    (string) The deleted swap ID\n"
+            "}\n"
+            "\nExamples:\n"
+            + HelpExampleCli("deleteswap", "\"abc123...:0\"")
+            + HelpExampleRpc("deleteswap", "\"abc123...:0\"")
+        );
+
+    LOCK2(cs_main, pwalletMain->cs_wallet);
+
+    std::string swapId = params[0].get_str();
+
+    // Verify swap exists before deleting
+    CAtomicSwapInfo swapInfo;
+    if (!pwalletMain->GetAtomicSwap(swapId, swapInfo)) {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Swap not found: " + swapId);
+    }
+
+    // Delete the swap
+    if (!pwalletMain->EraseAtomicSwap(swapId)) {
+        throw JSONRPCError(RPC_WALLET_ERROR, "Failed to delete swap: " + swapId);
+    }
+
+    // Return result
+    UniValue result(UniValue::VOBJ);
+    result.pushKV("deleted", true);
+    result.pushKV("swapId", swapId);
+
+    return result;
+}
+
+/**
+ * monitorswap "swapid"
+ *
+ * Monitor an atomic swap for claim or refund transactions.
+ * Returns detailed information about the swap's current status and any spend transaction.
+ *
+ * Arguments:
+ * 1. swapid  (string, required) The swap ID in format "txid:vout"
+ *
+ * Result:
+ * {
+ *   "swapId": "txid:vout",                      (string) The swap ID
+ *   "status": "...",                            (string) Current status
+ *   "contractTxid": "hex",                      (string) Contract transaction ID
+ *   "contractVout": n,                          (numeric) Output index
+ *   "amount": n.nnn,                            (numeric) Amount locked
+ *   "secretHash": "hex",                        (string) Secret hash
+ *   "locktime": n,                              (numeric) Refund locktime
+ *   "locktimeReached": true|false,              (boolean) Whether locktime expired
+ *   "timeUntilExpiry": "...",                   (string) Time until expiry (for active swaps)
+ *   "secondsUntilExpiry": n,                    (numeric) Seconds until expiry
+ *   "spendTxid": "hex",                         (string) Spend transaction ID (if spent)
+ *   "spendStatus": "...",                       (string) Spend status
+ *   "spendConfirmed": true|false,               (boolean) Whether spend is confirmed
+ *   "spendBlockHeight": n,                      (numeric) Block height of spend (if confirmed)
+ *   "isExpired": true|false,                    (boolean) Whether swap has expired
+ *   "requiresAction": true|false                (boolean) Whether swap requires user action
+ * }
+ */
+UniValue monitorswap(const UniValue& params, bool fHelp)
+{
+    if (!EnsureWalletIsAvailable(fHelp))
+        return NullUniValue;
+
+    if (fHelp || params.size() != 1)
+        throw runtime_error(
+            "monitorswap \"swapid\"\n"
+            "\nMonitor an atomic swap for claim or refund transactions.\n"
+            "\nArguments:\n"
+            "1. \"swapid\"  (string, required) The swap ID in format \"txid:vout\"\n"
+            "\nResult:\n"
+            "{\n"
+            "  \"swapId\": \"txid:vout\",                      (string) The swap ID\n"
+            "  \"status\": \"...\",                            (string) Current status\n"
+            "  \"contractTxid\": \"hex\",                      (string) Contract transaction ID\n"
+            "  \"contractVout\": n,                            (numeric) Output index\n"
+            "  \"amount\": n.nnn,                              (numeric) Amount locked\n"
+            "  \"secretHash\": \"hex\",                        (string) Secret hash\n"
+            "  \"locktime\": n,                                (numeric) Refund locktime\n"
+            "  \"locktimeReached\": true|false,                (boolean) Whether locktime expired\n"
+            "  \"timeUntilExpiry\": \"...\",                   (string) Time until expiry (for active swaps)\n"
+            "  \"secondsUntilExpiry\": n,                      (numeric) Seconds until expiry\n"
+            "  \"spendTxid\": \"hex\",                         (string) Spend transaction ID (if spent)\n"
+            "  \"spendStatus\": \"...\",                       (string) Spend status\n"
+            "  \"spendConfirmed\": true|false,                 (boolean) Whether spend is confirmed\n"
+            "  \"spendBlockHeight\": n,                        (numeric) Block height of spend (if confirmed)\n"
+            "  \"isExpired\": true|false,                      (boolean) Whether swap has expired\n"
+            "  \"requiresAction\": true|false                  (boolean) Whether swap requires user action\n"
+            "}\n"
+            "\nExamples:\n"
+            + HelpExampleCli("monitorswap", "\"abc123...:0\"")
+            + HelpExampleRpc("monitorswap", "\"abc123...:0\"")
+        );
+
+    LOCK2(cs_main, pwalletMain->cs_wallet);
+
+    std::string swapId = params[0].get_str();
+
+    // Get the swap from wallet
+    CAtomicSwapInfo swapInfo;
+    if (!pwalletMain->GetAtomicSwap(swapId, swapInfo)) {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, "Swap not found: " + swapId);
+    }
+
+    // Extract contract details
+    const AtomicSwapContract& contract = swapInfo.contract;
+
+    // Check if locktime has been reached
+    bool locktimeReached;
+    if (contract.lockTime < LOCKTIME_THRESHOLD) {
+        // Block height based
+        locktimeReached = chainActive.Height() >= contract.lockTime;
+    } else {
+        // Timestamp based
+        locktimeReached = GetTime() >= contract.lockTime;
+    }
+
+    // Calculate time until expiry for active swaps
+    int64_t timeUntilExpiry = 0;
+    bool hasExpired = false;
+
+    if (swapInfo.status == SWAP_INITIATED || swapInfo.status == SWAP_PARTICIPATED) {
+        if (contract.lockTime < LOCKTIME_THRESHOLD) {
+            // Block height based locktime
+            int currentHeight = chainActive.Height();
+            if (currentHeight >= contract.lockTime) {
+                hasExpired = true;
+            } else {
+                timeUntilExpiry = (contract.lockTime - currentHeight) * 150; // ~150 seconds per block
+            }
+        } else {
+            // Unix timestamp based locktime
+            int64_t currentTime = GetTime();
+            if (currentTime >= contract.lockTime) {
+                hasExpired = true;
+            } else {
+                timeUntilExpiry = contract.lockTime - currentTime;
+            }
+        }
+    }
+
+    // Determine if action is required
+    bool requiresAction = false;
+    if (swapInfo.status == SWAP_INITIATED && locktimeReached) {
+        requiresAction = true;  // Can refund if initiator
+    } else if (swapInfo.status == SWAP_PARTICIPATED && !swapInfo.spendTxid.IsNull()) {
+        requiresAction = true;  // Need to act on counterparty spending
+    }
+
+    // Build result
+    UniValue result(UniValue::VOBJ);
+    result.pushKV("swapId", swapInfo.GetSwapId());
+    result.pushKV("status", swapInfo.GetStatusString());
+    result.pushKV("contractTxid", swapInfo.contractTxid.GetHex());
+    result.pushKV("contractVout", (int)swapInfo.contractVout);
+    result.pushKV("amount", ValueFromAmount(swapInfo.amount));
+    result.pushKV("secretHash", swapInfo.contract.secretHash.GetHex());
+    result.pushKV("locktime", swapInfo.contract.lockTime);
+
+    // Add human-readable locktime if it's a Unix timestamp
+    if (swapInfo.contract.lockTime >= LOCKTIME_THRESHOLD) {
+        result.pushKV("locktimeFormatted",
+            DateTimeStrFormat("%Y-%m-%d %H:%M:%S UTC", swapInfo.contract.lockTime));
+    }
+
+    result.pushKV("locktimeReached", locktimeReached);
+
+    // Add time until expiry information for active swaps
+    if ((swapInfo.status == SWAP_INITIATED || swapInfo.status == SWAP_PARTICIPATED) && !hasExpired && timeUntilExpiry > 0) {
+        // Convert seconds to human-readable format
+        int days = timeUntilExpiry / 86400;
+        int hours = (timeUntilExpiry % 86400) / 3600;
+        int minutes = (timeUntilExpiry % 3600) / 60;
+        int seconds = timeUntilExpiry % 60;
+
+        std::string timeStr;
+        if (days > 0) {
+            timeStr = strprintf("%d day%s, %d hour%s",
+                days, (days != 1 ? "s" : ""),
+                hours, (hours != 1 ? "s" : ""));
+        } else if (hours > 0) {
+            timeStr = strprintf("%d hour%s, %d minute%s",
+                hours, (hours != 1 ? "s" : ""),
+                minutes, (minutes != 1 ? "s" : ""));
+        } else if (minutes > 0) {
+            timeStr = strprintf("%d minute%s, %d second%s",
+                minutes, (minutes != 1 ? "s" : ""),
+                seconds, (seconds != 1 ? "s" : ""));
+        } else {
+            timeStr = strprintf("%d second%s",
+                seconds, (seconds != 1 ? "s" : ""));
+        }
+
+        result.pushKV("timeUntilExpiry", timeStr);
+        result.pushKV("secondsUntilExpiry", timeUntilExpiry);
+    }
+
+    // Add spend transaction details if spent
+    if (!swapInfo.spendTxid.IsNull()) {
+        result.pushKV("spendTxid", swapInfo.spendTxid.GetHex());
+
+        // Get the spending transaction for status
+        CTransaction spendTx;
+        uint256 spendBlockHash;
+        if (GetTransaction(swapInfo.spendTxid, spendTx, Params().GetConsensus(), spendBlockHash, true)) {
+            if (!spendBlockHash.IsNull()) {
+                result.pushKV("spendConfirmed", true);
+                CBlockIndex* pindexSpend = mapBlockIndex.count(spendBlockHash) ? mapBlockIndex[spendBlockHash] : nullptr;
+                if (pindexSpend) {
+                    result.pushKV("spendBlockHeight", pindexSpend->nHeight);
+                    result.pushKV("spendBlockTime", (int)pindexSpend->GetBlockTime());
+                    result.pushKV("spendBlockTimeFormatted",
+                        DateTimeStrFormat("%Y-%m-%d %H:%M:%S UTC", pindexSpend->GetBlockTime()));
+                    result.pushKV("spendStatus", "confirmed");
+                }
+            } else {
+                result.pushKV("spendConfirmed", false);
+                result.pushKV("spendStatus", "pending in mempool");
+            }
+        }
+    }
+
+    result.pushKV("isExpired", hasExpired);
+    result.pushKV("requiresAction", requiresAction);
+
+    return result;
+}
+
 static const CRPCCommand commands[] =
 { //  category              name                      actor (function)         okSafeMode
   //  --------------------- ------------------------  -----------------------  ----------
@@ -1478,6 +1736,8 @@ static const CRPCCommand commands[] =
     { "atomicswap",         "refundswap",             &refundswap,             false },
     { "atomicswap",         "listatomicswaps",        &listatomicswaps,        true  },
     { "atomicswap",         "getswapsecret",          &getswapsecret,          false },
+    { "atomicswap",         "deleteswap",             &deleteswap,             false },
+    { "atomicswap",         "monitorswap",            &monitorswap,            true  },
 };
 
 void RegisterAtomicSwapRPCCommands(CRPCTable &tableRPC)
