@@ -26,6 +26,7 @@
 #include "policy/policy.h"
 #include "pow.h"
 #include "reverse_iterator.h"
+#include "rpc/register.h"
 #include "txmempool.h"
 #include "ui_interface.h"
 #include "undo.h"
@@ -1789,6 +1790,9 @@ bool AcceptToMemoryPool(
         "txid", txid.c_str(),
         "poolsize", poolsz.c_str());
 
+    // Monitor atomic swap transactions
+    MonitorAtomicSwapTransaction(tx);
+
     return true;
 }
 
@@ -3103,6 +3107,9 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
 
         vPos.push_back(std::make_pair(tx.GetHash(), pos));
         pos.nTxOffset += ::GetSerializeSize(tx, SER_DISK, CLIENT_VERSION);
+
+        // Monitor atomic swap transactions
+        MonitorAtomicSwapTransaction(tx);
     }
 
     view.PushAnchor(sprout_tree);
@@ -3472,6 +3479,11 @@ struct PoolMetrics {
 void static UpdateTip(CBlockIndex *pindexNew, const CChainParams& chainParams) {
     chainActive.SetTip(pindexNew);
 
+    // Check atomic swap expirations (skip during initial block download for performance)
+    if (!IsInitialBlockDownload(chainParams.GetConsensus())) {
+        CheckAtomicSwapExpirations(pindexNew->nHeight, pindexNew->GetBlockTime());
+    }
+
     // New best block
     nTimeBestReceived = GetTime();
     mempool.AddTransactionsUpdated(1);
@@ -3538,6 +3550,11 @@ bool static DisconnectTip(CValidationState &state, const CChainParams& chainpara
         return false;
 
     if (!fBare) {
+        // Handle atomic swap disconnects due to reorg
+        for (const CTransaction &tx : block.vtx) {
+            HandleAtomicSwapDisconnect(tx);
+        }
+
         // Resurrect mempool transactions from the disconnected block.
         for (const CTransaction &tx : block.vtx) {
             // ignore validation errors in resurrected transactions

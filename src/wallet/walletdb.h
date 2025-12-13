@@ -22,6 +22,7 @@ static const bool DEFAULT_FLUSHWALLET = true;
 
 class CAccount;
 class CAccountingEntry;
+class CAtomicSwapInfo;
 struct CBlockLocator;
 class CKeyPool;
 class CMasterKey;
@@ -221,6 +222,12 @@ public:
     bool EraseSproutViewingKey(const libzcash::SproutViewingKey &vk);
     bool WriteSaplingExtendedFullViewingKey(const libzcash::SaplingExtendedFullViewingKey &extfvk);
     bool EraseSaplingExtendedFullViewingKey(const libzcash::SaplingExtendedFullViewingKey &extfvk);
+
+    // Atomic swap database methods
+    bool WriteAtomicSwap(const std::string& swapId, const CAtomicSwapInfo& swapInfo);
+    bool ReadAtomicSwap(const std::string& swapId, CAtomicSwapInfo& swapInfo);
+    bool EraseAtomicSwap(const std::string& swapId);
+    bool ListAtomicSwaps(std::vector<CAtomicSwapInfo>& swaps);
 
     static void IncrementUpdateCounter();
     static unsigned int GetUpdateCounter();
