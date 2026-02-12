@@ -12,11 +12,57 @@
 #include "ui_interface.h"
 #include "crypto/hmac_sha256.h"
 #include <stdio.h>
+#include <zlib.h>
 
 #include <boost/algorithm/string.hpp> // boost::trim
 
 /** WWW-Authenticate to present with 401 Unauthorized response */
 static const char* WWW_AUTH_HEADER_DATA = "Basic realm=\"jsonrpc\"";
+
+/** Compress data using gzip
+ * @param input the uncompressed data
+ * @return compressed data, or empty string on failure
+ */
+static std::string GzipCompress(const std::string& input)
+{
+    if (input.empty()) {
+        return input;
+    }
+
+    z_stream stream;
+    stream.zalloc = Z_NULL;
+    stream.zfree = Z_NULL;
+    stream.opaque = Z_NULL;
+
+    /* // Initialize deflate with gzip format (wbits | 16)
+    if (deflateInit2(&stream, Z_DEFAULT_COMPRESSION, Z_DEFLATED, 15 | 16, 8, Z_DEFAULT_STRATEGY) != Z_OK) {
+        return "";
+    } */
+
+    // Initialize deflate with gzip format (wbits | 16)
+    if (deflateInit2(&stream, Z_BEST_SPEED, Z_DEFLATED, 15 | 16, 8, Z_DEFAULT_STRATEGY) != Z_OK) {
+        return "";
+    }
+
+    stream.avail_in = input.size();
+    stream.next_in = (unsigned char*)input.c_str();
+
+    std::string output;
+    output.resize(deflateBound(&stream, input.size()));
+
+    stream.avail_out = output.size();
+    stream.next_out = (unsigned char*)output.data();
+
+    int ret = deflate(&stream, Z_FINISH);
+    deflateEnd(&stream);
+
+    if (ret != Z_STREAM_END) {
+        return "";
+    }
+
+    output.resize(stream.total_out);
+    return output;
+}
 
 /** Simple one-shot callback timer to be used by the RPC mechanism to e.g.
  * re-lock the wallet.
@@ -190,7 +236,22 @@ static bool HTTPReq_JSONRPC(HTTPRequest* req, const std::string &)
             throw JSONRPCError(RPC_PARSE_ERROR, "Top-level object parse error");
 
         req->WriteHeader("Content-Type", "application/json");
-        req->WriteReply(HTTP_OK, strReply);
+
+        // Check if client accepts gzip compression
+        std::pair<bool, std::string> acceptEncoding = req->GetHeader("accept-encoding");
+        if (acceptEncoding.first && acceptEncoding.second.find("gzip") != std::string::npos && strReply.size() > 1024) {
+            // Compress response if it's worth it (> 1KB)
+            std::string compressed = GzipCompress(strReply);
+            if (!compressed.empty()) {
+                req->WriteHeader("Content-Encoding", "gzip");
+                req->WriteReply(HTTP_OK, compressed);
+            } else {
+                // Fall back to uncompressed if compression fails
+                req->WriteReply(HTTP_OK, strReply);
+            }
+        } else {
+            req->WriteReply(HTTP_OK, strReply);
+        }
     } catch (const UniValue& objError) {
         JSONErrorReply(req, objError, jreq.id);
         return false;

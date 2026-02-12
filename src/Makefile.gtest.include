@@ -88,6 +88,7 @@ ycash_gtest_LDADD += \
   $(EVENT_PTHREADS_LIBS) \
   $(EVENT_LIBS) \
   $(ZMQ_LIBS) \
+  $(ZLIB_LIBS) \
   $(LIBRUSTZCASH) \
   $(LIBZCASH) \
   $(LIBZCASH_LIBS)
