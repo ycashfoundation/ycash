@@ -27,6 +27,7 @@
 #include "pow.h"
 #include "reverse_iterator.h"
 #include "rpc/register.h"
+#include "script/script.h"
 #include "txmempool.h"
 #include "ui_interface.h"
 #include "undo.h"
@@ -2668,8 +2669,20 @@ static DisconnectResult DisconnectBlock(const CBlock& block, CValidationState& s
             for (unsigned int k = tx.vout.size(); k-- > 0;) {
                 const CTxOut &out = tx.vout[k];
                 CScript::ScriptType scriptType = out.scriptPubKey.GetType();
-                if (scriptType != CScript::UNKNOWN) {
-                    uint160 const addrHash = out.scriptPubKey.AddressHash();
+                if (scriptType != CScript::UNKNOWN)
+                {
+                    uint160 addrHash;
+
+                    if (scriptType == CScript::P2PK)
+                    {
+                        // mimic P2PKH
+                        scriptType = CScript::P2PKH;
+                        addrHash = Hash160(out.scriptPubKey.begin()+1, out.scriptPubKey.end()-1);
+                    }
+                    else
+                    {
+                        addrHash = out.scriptPubKey.AddressHash();
+                    }
 
                     // undo receiving activity
                     addressIndex.push_back(make_pair(
@@ -2725,8 +2738,20 @@ static DisconnectResult DisconnectBlock(const CBlock& block, CValidationState& s
                 if (fAddressIndex && updateIndices) {
                     const CTxOut &prevout = view.GetOutputFor(input);
                     CScript::ScriptType scriptType = prevout.scriptPubKey.GetType();
-                    if (scriptType != CScript::UNKNOWN) {
-                        uint160 const addrHash = prevout.scriptPubKey.AddressHash();
+                    if (scriptType != CScript::UNKNOWN)
+                    {
+                        uint160 addrHash;
+
+                        if (scriptType == CScript::P2PK)
+                        {
+                            // mimic P2PKH
+                            scriptType = CScript::P2PKH;
+                            addrHash = Hash160(prevout.scriptPubKey.begin()+1, prevout.scriptPubKey.end()-1);
+                        }
+                        else
+                        {
+                            addrHash = prevout.scriptPubKey.AddressHash();
+                        }
 
                         // undo spending activity
                         addressIndex.push_back(make_pair(
@@ -3029,8 +3054,21 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
                     const CTxIn input = tx.vin[j];
                     const CTxOut &prevout = view.GetOutputFor(tx.vin[j]);
                     CScript::ScriptType scriptType = prevout.scriptPubKey.GetType();
-                    const uint160 addrHash = prevout.scriptPubKey.AddressHash();
-                    if (fAddressIndex && scriptType != CScript::UNKNOWN) {
+                    uint160 addrHash;
+
+                    if (scriptType == CScript::P2PK)
+                    {
+                        // mimic P2PKH
+                        scriptType = CScript::P2PKH;
+                        addrHash = Hash160(prevout.scriptPubKey.begin()+1, prevout.scriptPubKey.end()-1);
+                    }
+                    else
+                    {
+                        addrHash = prevout.scriptPubKey.AddressHash();
+                    }
+
+                    if (fAddressIndex && scriptType != CScript::UNKNOWN)
+                    {
                         // record spending activity
                         addressIndex.push_back(make_pair(
                             CAddressIndexKey(scriptType, addrHash, pindex->nHeight, i, hash, j, true),
@@ -3095,8 +3133,20 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
             for (unsigned int k = 0; k < tx.vout.size(); k++) {
                 const CTxOut &out = tx.vout[k];
                 CScript::ScriptType scriptType = out.scriptPubKey.GetType();
-                if (scriptType != CScript::UNKNOWN) {
-                    uint160 const addrHash = out.scriptPubKey.AddressHash();
+                if (scriptType != CScript::UNKNOWN)
+                {
+                    uint160 addrHash;
+
+                    if (scriptType == CScript::P2PK)
+                    {
+                        // mimic P2PKH
+                        scriptType = CScript::P2PKH;
+                        addrHash = Hash160(out.scriptPubKey.begin()+1, out.scriptPubKey.end()-1);
+                    }
+                    else
+                    {
+                        addrHash = out.scriptPubKey.AddressHash();
+                    }
 
                     // record receiving activity
                     addressIndex.push_back(make_pair(
