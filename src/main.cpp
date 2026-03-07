@@ -3151,6 +3151,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
         // both for the supply and for the transparent pool.
         pindex->nChainSupplyDelta = chainSupplyDelta;
         pindex->nTransparentValue = transparentValueDelta;
+        pindex->nBlockFee = nFees;
         if (pindex->pprev) {
             if (pindex->pprev->nChainTotalSupply) {
                 pindex->nChainTotalSupply = *pindex->pprev->nChainTotalSupply + chainSupplyDelta;
@@ -4172,6 +4173,7 @@ void SetChainPoolValues(
     // the following values are computed here only for the genesis block
     CAmount chainSupplyDelta = 0;
     CAmount transparentValueDelta = 0;
+    CAmount blockFee = 0;
 
     CAmount sproutValue = 0;
     CAmount saplingValue = 0;
@@ -4203,9 +4205,11 @@ void SetChainPoolValues(
     if (pindex->pprev == nullptr) {
         pindex->nChainSupplyDelta = chainSupplyDelta;
         pindex->nTransparentValue = transparentValueDelta;
+        pindex->nBlockFee = blockFee;
     } else {
         pindex->nChainSupplyDelta = std::nullopt;
         pindex->nTransparentValue = std::nullopt;
+        pindex->nBlockFee = std::nullopt;
     }
 
     pindex->nChainTotalSupply = std::nullopt;

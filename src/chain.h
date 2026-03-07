@@ -268,6 +268,11 @@ public:
     //! Will be std::nullopt if nChainTx is zero.
     std::optional<CAmount> nChainTransparentValue;
 
+    //! Total fee that should have been included in block reward
+    //!
+    //! Will be std::nullopt for older blocks until a reindex has taken place.
+    std::optional<CAmount> nBlockFee;
+
     //! Change in value held by the Sprout circuit over this block.
     //! Will be std::nullopt for older blocks on old nodes until a reindex has taken place.
     std::optional<CAmount> nSproutValue;
@@ -340,6 +345,7 @@ public:
         nChainSupplyDelta = std::nullopt;
         nChainTotalSupply = std::nullopt;
         nTransparentValue = std::nullopt;
+        nBlockFee = std::nullopt;
         nChainTransparentValue = std::nullopt;
 
         nSproutValue = std::nullopt;
@@ -540,6 +546,7 @@ public:
         if ((s.GetType() & SER_DISK) && (nVersion >= TRANSPARENT_VALUE_VERSION)) {
             READWRITE(nChainSupplyDelta);
             READWRITE(nTransparentValue);
+            READWRITE(nBlockFee);
         }
 
         // Only read/write nSproutValue if the client version used to create

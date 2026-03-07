@@ -578,6 +578,7 @@ bool CBlockTreeDB::LoadBlockIndexGuts(
                 pindexNew->nTx            = diskindex.nTx;
                 pindexNew->nChainSupplyDelta = diskindex.nChainSupplyDelta;
                 pindexNew->nTransparentValue = diskindex.nTransparentValue;
+                pindexNew->nBlockFee      = diskindex.nBlockFee;
                 pindexNew->nSproutValue   = diskindex.nSproutValue;
                 pindexNew->nSaplingValue  = diskindex.nSaplingValue;
                 pindexNew->hashFinalSaplingRoot = diskindex.hashFinalSaplingRoot;
