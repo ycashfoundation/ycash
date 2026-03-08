@@ -440,7 +440,7 @@ bool CBlockTreeDB::ReadAddressIndex(
         std::vector<CAddressIndexDbEntry> &addressIndex,
         int start, int end)
 {
-    boost::scoped_ptr<CDBIterator> pcursor(NewIterator());
+    std::unique_ptr<CDBIterator> pcursor(NewIterator());
 
     if (start > 0 && end > 0) {
         pcursor->Seek(make_pair(DB_ADDRESSINDEX, CAddressIndexIteratorHeightKey(type, addressHash, start)));
@@ -448,8 +448,9 @@ bool CBlockTreeDB::ReadAddressIndex(
         pcursor->Seek(make_pair(DB_ADDRESSINDEX, CAddressIndexIteratorKey(type, addressHash)));
     }
 
+    addressIndex.reserve(addressIndex.size() + 1000);
+
     while (pcursor->Valid()) {
-        boost::this_thread::interruption_point();
         std::pair<char,CAddressIndexKey> key;
         if (!(pcursor->GetKey(key) && key.first == DB_ADDRESSINDEX && key.second.hashBytes == addressHash))
             break;
@@ -458,7 +459,7 @@ bool CBlockTreeDB::ReadAddressIndex(
         CAmount nValue;
         if (!pcursor->GetValue(nValue))
             return error("failed to get address index value");
-        addressIndex.push_back(make_pair(key.second, nValue));
+        addressIndex.emplace_back(key.second, nValue);
         pcursor->Next();
     }
     return true;

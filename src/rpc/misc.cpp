@@ -912,29 +912,49 @@ UniValue getaddressdeltas(const UniValue& params, bool fHelp)
         }
     }
 
+    // optimization for the most common case (scan for a single address)
+    int first_type = 0;
+    uint160 first_hashBytes = uint160();
+    std::string first_address;
+
+    if (addressIndex.size() > 0)
+    {
+        first_type = addressIndex[0].first.type;
+        first_hashBytes = addressIndex[0].first.hashBytes;
+        if (!getAddressFromIndex(first_type, first_hashBytes, first_address))
+        {
+            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Unknown address type");
+        }
+    }
+
     UniValue deltas(UniValue::VARR);
-    for (const auto& it : addressIndex) {
+    for (const auto& [indexKey, indexDelta] : addressIndex) {
         std::string address;
-        if (!getAddressFromIndex(it.first.type, it.first.hashBytes, address)) {
+
+        if (indexKey.type == first_type && indexKey.hashBytes == first_hashBytes)
+        {
+            address = first_address;
+        }
+        else if (!getAddressFromIndex(indexKey.type, indexKey.hashBytes, address))
+        {
             throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Unknown address type");
         }
 
         UniValue delta(UniValue::VOBJ);
         delta.pushKV("address", address);
-        delta.pushKV("blockindex", (int)it.first.txindex);
-        delta.pushKV("height", it.first.blockHeight);
-        delta.pushKV("index", (int)it.first.index);
-        delta.pushKV("satoshis", it.second);
-        delta.pushKV("txid", it.first.txhash.GetHex());
+        delta.pushKV("blockindex", (int)indexKey.txindex);
+        delta.pushKV("height", indexKey.blockHeight);
+        delta.pushKV("index", (int)indexKey.index);
+        delta.pushKV("satoshis", indexDelta);
+        delta.pushKV("txid", indexKey.txhash.GetHex());
         deltas.push_back(delta);
     }
-
-    UniValue result(UniValue::VOBJ);
 
     if (!(includeChainInfo && start > 0 && end > 0)) {
         return deltas;
     }
 
+    UniValue result(UniValue::VOBJ);
     UniValue startInfo(UniValue::VOBJ);
     UniValue endInfo(UniValue::VOBJ);
     {
