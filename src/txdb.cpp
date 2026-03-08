@@ -584,18 +584,9 @@ bool CBlockTreeDB::LoadBlockIndexGuts(
                 pindexNew->hashFinalSaplingRoot = diskindex.hashFinalSaplingRoot;
                 pindexNew->hashChainHistoryRoot = diskindex.hashChainHistoryRoot;
 
-                // Consistency checks
-                CBlockHeader header;
-                {
-                    LOCK(cs_main);
-                    header = pindexNew->GetBlockHeader();
-                }
-                if (header.GetHash() != diskindex.GetBlockHash())
-                    return error("LoadBlockIndex(): inconsistent header vs diskindex hash: header hash = %s, diskindex hash = %s",
-                        header.GetHash().ToString(), diskindex.GetBlockHash().ToString());
-                if (header.GetHash() != pindexNew->GetBlockHash())
-                    return error("LoadBlockIndex(): block header inconsistency detected: on-disk = %s, in-memory = %s",
-                       diskindex.ToString(),  pindexNew->ToString());
+                // Check the block hash against the required difficulty as encoded in the
+                // nBits field. The probability of this succeeding randomly is low enough
+                // that it is a useful check to detect logic or disk storage errors.
                 if (!CheckProofOfWork(pindexNew->GetBlockHash(), pindexNew->nBits, Params().GetConsensus()))
                     return error("LoadBlockIndex(): CheckProofOfWork failed: %s", pindexNew->ToString());
 
