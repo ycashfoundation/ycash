@@ -12,6 +12,7 @@
 #include "netbase.h"
 #include "rpc/server.h"
 #include "txmempool.h"
+#include "uint256.h"
 #include "util.h"
 #ifdef ENABLE_WALLET
 #include "wallet/wallet.h"
@@ -20,6 +21,7 @@
 
 #include <stdint.h>
 #include <variant>
+#include <unordered_set>
 
 #include <boost/assign/list_of.hpp>
 
@@ -998,15 +1000,20 @@ UniValue getaddressbalance(const UniValue& params, bool fHelp)
 
     CAmount balance = 0;
     CAmount received = 0;
+    std::unordered_set<uint256> txids;
+    txids.reserve(addressIndex.size() / 2);
+
     for (const auto& it : addressIndex) {
         if (it.second > 0) {
             received += it.second;
         }
         balance += it.second;
+        txids.insert(it.first.txhash);
     }
     UniValue result(UniValue::VOBJ);
     result.pushKV("balance", balance);
     result.pushKV("received", received);
+    result.pushKV("txcount", txids.size());
     return result;
 }
 
