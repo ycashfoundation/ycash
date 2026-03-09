@@ -34,9 +34,9 @@ bool DecodeBase58(const char* psz, std::vector<unsigned char>& vch)
             return false;
         // Apply "b256 = b256 * 58 + ch".
         int carry = ch - pszBase58;
-        for (std::vector<unsigned char>::reverse_iterator it = b256.rbegin(); it != b256.rend(); it++) {
-            carry += 58 * (*it);
-            *it = carry % 256;
+        for (int i = (int)b256.size() - 1; i >= 0; --i) {
+            carry += 58 * b256[i];
+            b256[i] = carry % 256;
             carry /= 256;
         }
         assert(carry == 0);
@@ -48,14 +48,20 @@ bool DecodeBase58(const char* psz, std::vector<unsigned char>& vch)
     if (*psz != 0)
         return false;
     // Skip leading zeroes in b256.
-    std::vector<unsigned char>::iterator it = b256.begin();
-    while (it != b256.end() && *it == 0)
-        it++;
-    // Copy result into output vector.
-    vch.reserve(zeroes + (b256.end() - it));
-    vch.assign(zeroes, 0x00);
-    while (it != b256.end())
-        vch.push_back(*(it++));
+    size_t b256_start = 0;
+    while (b256_start < b256.size() && b256[b256_start] == 0)
+        b256_start++;
+
+    // Copy result into output vector (single allocation).
+    size_t result_size = zeroes + (b256.size() - b256_start);
+    vch.resize(result_size);
+
+    // Fill leading zero bytes and copy remaining bytes using memset/memcpy
+    if (zeroes > 0)
+        memset(&vch[0], 0x00, zeroes);
+    if (b256_start < b256.size())
+        memcpy(&vch[zeroes], &b256[b256_start], b256.size() - b256_start);
+
     return true;
 }
 
@@ -73,24 +79,32 @@ std::string EncodeBase58(const unsigned char* pbegin, const unsigned char* pend)
     while (pbegin != pend) {
         int carry = *pbegin;
         // Apply "b58 = b58 * 256 + ch".
-        for (std::vector<unsigned char>::reverse_iterator it = b58.rbegin(); it != b58.rend(); it++) {
-            carry += 256 * (*it);
-            *it = carry % 58;
+        for (int i = (int)b58.size() - 1; i >= 0; --i) {
+            carry += 256 * b58[i];
+            b58[i] = carry % 58;
             carry /= 58;
         }
         assert(carry == 0);
         pbegin++;
     }
     // Skip leading zeroes in base58 result.
-    std::vector<unsigned char>::iterator it = b58.begin();
-    while (it != b58.end() && *it == 0)
-        it++;
-    // Translate the result into a string.
+    size_t b58_start = 0;
+    while (b58_start < b58.size() && b58[b58_start] == 0)
+        b58_start++;
+
+    // Translate the result into a string (single allocation + direct writes).
+    size_t result_size = zeroes + (b58.size() - b58_start);
     std::string str;
-    str.reserve(zeroes + (b58.end() - it));
-    str.assign(zeroes, '1');
-    while (it != b58.end())
-        str += pszBase58[*(it++)];
+    str.resize(result_size);
+
+    // Fill leading '1' characters
+    for (int i = 0; i < zeroes; ++i)
+        str[i] = '1';
+
+    // Copy remaining base58 characters
+    for (size_t i = b58_start; i < b58.size(); ++i)
+        str[zeroes + (i - b58_start)] = pszBase58[b58[i]];
+
     return str;
 }
 
