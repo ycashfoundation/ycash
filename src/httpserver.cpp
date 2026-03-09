@@ -16,6 +16,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <malloc.h>
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -603,6 +604,12 @@ void HTTPRequest::WriteReply(int nStatus, const std::string& strReply)
                 }
             }
         }
+        // Trim allocator heap after sending large RPC response to return memory to OS
+        // This helps prevent persistent memory retention after RPC calls
+        // (glibc malloc only - not available on Windows or macOS)
+#if defined(__GLIBC__) && !defined(_WIN32)
+        malloc_trim(0);
+#endif
     });
     ev->trigger(0);
     replySent = true;

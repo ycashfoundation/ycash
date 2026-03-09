@@ -12,6 +12,7 @@
 #include "utilstrencodings.h"
 
 #include <stdio.h>
+#include <malloc.h>
 
 #include <event2/buffer.h>
 #include <event2/keyvalq_struct.h>
@@ -432,5 +433,13 @@ int main(int argc, char* argv[])
     } catch (...) {
         PrintExceptionContinue(NULL, "CommandLineRPC()");
     }
+
+    // Trim heap to return memory to OS after processing RPC response
+    // This prevents persistent memory retention after large RPC calls
+    // (glibc malloc only - not available on Windows or macOS)
+#if defined(__GLIBC__) && !defined(_WIN32)
+    malloc_trim(0);
+#endif
+
     return ret;
 }
