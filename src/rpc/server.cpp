@@ -475,6 +475,7 @@ static UniValue JSONRPCExecOne(const UniValue& req)
 std::string JSONRPCExecBatch(const UniValue& vReq)
 {
     UniValue ret(UniValue::VARR);
+    ret.reserve(vReq.size());
     for (size_t reqIdx = 0; reqIdx < vReq.size(); reqIdx++)
         ret.push_back(JSONRPCExecOne(vReq[reqIdx]));
 

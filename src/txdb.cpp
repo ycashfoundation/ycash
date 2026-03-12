@@ -448,7 +448,7 @@ bool CBlockTreeDB::ReadAddressIndex(
         pcursor->Seek(make_pair(DB_ADDRESSINDEX, CAddressIndexIteratorKey(type, addressHash)));
     }
 
-    addressIndex.reserve(addressIndex.size() + 1000);
+    addressIndex.reserve(addressIndex.size() + 16384);
 
     while (pcursor->Valid()) {
         std::pair<char,CAddressIndexKey> key;
