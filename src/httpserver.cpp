@@ -16,7 +16,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <malloc.h>
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -591,7 +590,8 @@ void HTTPRequest::WriteReply(int nStatus, const std::string& strReply)
     assert(evb);
     evbuffer_add(evb, strReply.data(), strReply.size());
     auto req_copy = req;
-    HTTPEvent* ev = new HTTPEvent(eventBase, true, [req_copy, nStatus]{
+    size_t replySize = strReply.size();
+    HTTPEvent* ev = new HTTPEvent(eventBase, true, [req_copy, nStatus, replySize]{
         evhttp_send_reply(req_copy, nStatus, nullptr, nullptr);
         // Re-enable reading from the socket. This is the second part of the libevent
         // workaround above.
@@ -604,16 +604,43 @@ void HTTPRequest::WriteReply(int nStatus, const std::string& strReply)
                 }
             }
         }
-        // Trim allocator heap after sending large RPC response to return memory to OS
-        // This helps prevent persistent memory retention after RPC calls
-        // (glibc malloc only - not available on Windows or macOS)
-#if defined(__GLIBC__) && !defined(_WIN32)
-        malloc_trim(0);
-#endif
+        if (replySize >= 65536)
+            TrimMallocHeap("http-reply");
     });
     ev->trigger(0);
     replySent = true;
     req = 0; // transferred back to main thread
+}
+
+void HTTPRequest::WriteReply(int nStatus, std::string&& strReply)
+{
+    assert(!replySent && req);
+    struct evbuffer* evb = evhttp_request_get_output_buffer(req);
+    assert(evb);
+    // Zero-copy: move string to heap, hand ownership to evbuffer cleanup callback
+    auto* reply_data = new std::string(std::move(strReply));
+    size_t replySize = reply_data->size();
+    evbuffer_add_reference(evb, reply_data->data(), replySize,
+        [](const void*, size_t, void* arg) { delete static_cast<std::string*>(arg); },
+        reply_data);
+    auto req_copy = req;
+    HTTPEvent* ev = new HTTPEvent(eventBase, true, [req_copy, nStatus, replySize]{
+        evhttp_send_reply(req_copy, nStatus, nullptr, nullptr);
+        if (event_get_version_number() >= 0x02010600 && event_get_version_number() < 0x02020001) {
+            evhttp_connection* conn = evhttp_request_get_connection(req_copy);
+            if (conn) {
+                bufferevent* bev = evhttp_connection_get_bufferevent(conn);
+                if (bev) {
+                    bufferevent_enable(bev, EV_READ | EV_WRITE);
+                }
+            }
+        }
+        if (replySize >= 65536)
+            TrimMallocHeap("http-reply-move");
+    });
+    ev->trigger(0);
+    replySent = true;
+    req = 0;
 }
 
 CService HTTPRequest::GetPeer()

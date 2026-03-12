@@ -20,6 +20,9 @@
 
 #include <stdarg.h>
 #include <stdio.h>
+#if defined(__GLIBC__) && !defined(_WIN32)
+#include <malloc.h>
+#endif
 
 #if (defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__DragonFly__))
 #include <pthread.h>
@@ -672,4 +675,17 @@ std::string LicenseInfo()
 int GetNumCores()
 {
     return boost::thread::physical_concurrency();
+}
+
+void TrimMallocHeap(const char* context)
+{
+#if defined(__GLIBC__) && !defined(_WIN32)
+    int64_t t0 = GetTimeMicros();
+    malloc_trim(0);
+    int64_t elapsed = GetTimeMicros() - t0;
+    if (context)
+        LogPrint("malloc_trim", "malloc_trim(%s): %dµs\n", context, elapsed);
+    else
+        LogPrint("malloc_trim", "malloc_trim: %dµs\n", elapsed);
+#endif
 }

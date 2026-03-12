@@ -25,6 +25,7 @@
 #include "script/script.h"
 #include "script/sign.h"
 #include "timedata.h"
+#include "util.h"
 #include "utilmoneystr.h"
 #include "zcash/JoinSplit.hpp"
 #include "zcash/Note.hpp"
@@ -4098,10 +4099,7 @@ unsigned int CWallet::DeleteTransactions(std::vector<uint256> &removeTxs, std::v
         }
     }
 
-    // release memory as soon as possible
-    #ifdef __linux__
-    malloc_trim(0);
-    #endif
+    TrimMallocHeap("wallet-connect-block");
 
     uint64_t nTime2 = GetTimeMicros();
     LogPrint("wr", "DeleteTransactions() leave after %.2f ms\n", (nTime2 - nTime1) * 0.001);
