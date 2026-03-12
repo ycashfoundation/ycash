@@ -115,7 +115,7 @@ UniValue TxJoinSplitToJSON(const CTransaction& tx) {
             joinsplit.pushKV("ciphertexts", ciphertexts);
         }
 
-        vJoinSplit.push_back(joinsplit);
+        vJoinSplit.push_back(std::move(joinsplit));
     }
     return vJoinSplit;
 }
@@ -130,7 +130,7 @@ UniValue TxShieldedSpendsToJSON(const CTransaction& tx) {
         obj.pushKV("rk", spendDesc.rk.GetHex());
         obj.pushKV("proof", HexStr(spendDesc.zkproof.begin(), spendDesc.zkproof.end()));
         obj.pushKV("spendAuthSig", HexStr(spendDesc.spendAuthSig.begin(), spendDesc.spendAuthSig.end()));
-        vdesc.push_back(obj);
+        vdesc.push_back(std::move(obj));
     }
     return vdesc;
 }
@@ -145,7 +145,7 @@ UniValue TxShieldedOutputsToJSON(const CTransaction& tx) {
         obj.pushKV("encCiphertext", HexStr(outputDesc.encCiphertext.begin(), outputDesc.encCiphertext.end()));
         obj.pushKV("outCiphertext", HexStr(outputDesc.outCiphertext.begin(), outputDesc.outCiphertext.end()));
         obj.pushKV("proof", HexStr(outputDesc.zkproof.begin(), outputDesc.zkproof.end()));
-        vdesc.push_back(obj);
+        vdesc.push_back(std::move(obj));
     }
     return vdesc;
 }
@@ -196,7 +196,7 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, UniValue& entry)
             }
         }
         in.pushKV("sequence", (int64_t)txin.nSequence);
-        vin.push_back(in);
+        vin.push_back(std::move(in));
     }
     entry.pushKV("vin", vin);
     UniValue vout(UniValue::VARR);
@@ -219,7 +219,7 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, UniValue& entry)
             out.pushKV("spentIndex", (int)spentInfo.inputIndex);
             out.pushKV("spentHeight", spentInfo.blockHeight);
         }
-        vout.push_back(out);
+        vout.push_back(std::move(out));
     }
     entry.pushKV("vout", vout);
 
@@ -808,7 +808,7 @@ static void TxInErrorToJSON(const CTxIn& txin, UniValue& vErrorsRet, const std::
     entry.pushKV("scriptSig", HexStr(txin.scriptSig.begin(), txin.scriptSig.end()));
     entry.pushKV("sequence", (uint64_t)txin.nSequence);
     entry.pushKV("error", strMessage);
-    vErrorsRet.push_back(entry);
+    vErrorsRet.push_back(std::move(entry));
 }
 
 UniValue signrawtransaction(const UniValue& params, bool fHelp)

@@ -120,7 +120,7 @@ static void JSONErrorReply(HTTPRequest* req, const UniValue& objError, const Uni
     std::string strReply = JSONRPCReply(NullUniValue, objError, id);
 
     req->WriteHeader("Content-Type", "application/json");
-    req->WriteReply(nStatus, strReply);
+    req->WriteReply(nStatus, std::move(strReply));
 }
 
 //This function checks username and password against -rpcauth
@@ -244,13 +244,13 @@ static bool HTTPReq_JSONRPC(HTTPRequest* req, const std::string &)
             std::string compressed = GzipCompress(strReply);
             if (!compressed.empty()) {
                 req->WriteHeader("Content-Encoding", "gzip");
-                req->WriteReply(HTTP_OK, compressed);
+                req->WriteReply(HTTP_OK, std::move(compressed));
             } else {
                 // Fall back to uncompressed if compression fails
-                req->WriteReply(HTTP_OK, strReply);
+                req->WriteReply(HTTP_OK, std::move(strReply));
             }
         } else {
-            req->WriteReply(HTTP_OK, strReply);
+            req->WriteReply(HTTP_OK, std::move(strReply));
         }
     } catch (const UniValue& objError) {
         JSONErrorReply(req, objError, jreq.id);

@@ -664,7 +664,7 @@ UniValue getaddressmempool(const UniValue& params, bool fHelp)
             delta.pushKV("prevtxid", it.second.prevhash.GetHex());
             delta.pushKV("prevout", (int)it.second.prevout);
         }
-        result.push_back(delta);
+        result.push_back(std::move(delta));
     }
     return result;
 }
@@ -765,7 +765,7 @@ UniValue getaddressutxos(const UniValue& params, bool fHelp)
         output.pushKV("script", HexStr(it.second.script.begin(), it.second.script.end()));
         output.pushKV("satoshis", it.second.satoshis);
         output.pushKV("height", it.second.blockHeight);
-        utxos.push_back(output);
+        utxos.push_back(std::move(output));
     }
 
     if (!includeChainInfo)
@@ -928,6 +928,7 @@ UniValue getaddressdeltas(const UniValue& params, bool fHelp)
     }
 
     UniValue deltas(UniValue::VARR);
+    deltas.reserve(addressIndex.size());
     for (const auto& [indexKey, indexDelta] : addressIndex) {
         std::string address;
 
@@ -947,7 +948,7 @@ UniValue getaddressdeltas(const UniValue& params, bool fHelp)
         delta.pushKV("index", (int)indexKey.index);
         delta.pushKV("satoshis", indexDelta);
         delta.pushKV("txid", indexKey.txhash.GetHex());
-        deltas.push_back(delta);
+        deltas.push_back(std::move(delta));
     }
 
     if (!(includeChainInfo && start > 0 && end > 0)) {
