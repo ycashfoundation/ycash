@@ -1852,6 +1852,21 @@ bool GetAddressUnspent(const uint160& addressHash, int type,
     return true;
 }
 
+bool GetAddressFirstLastHeight(const uint160& addressHash, int type,
+        int& firstHeight, int& lastHeight)
+{
+    if (!fAddressIndex)
+        return error("address index not enabled");
+
+    if (!pblocktree->ReadAddressFirstLastHeight(addressHash, type, firstHeight, lastHeight))
+        return error("unable to get first and last height for address");
+
+    return true;
+}
+
+bool GetAddressFirstLastHeight(const uint160& addressHash, int type,
+        int& firstHeight, int& lastHeight);
+
 /**
  * Return transaction in txOut, and if it was found inside a block, its hash is placed in hashBlock.
  * If blockIndex is provided, the transaction is fetched from the corresponding block.

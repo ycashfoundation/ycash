@@ -465,6 +465,26 @@ bool CBlockTreeDB::ReadAddressIndex(
     return true;
 }
 
+bool CBlockTreeDB::ReadAddressFirstLastHeight(uint160 addressHash, int type, int &firstHeight, int &lastHeight)
+{
+    std::unique_ptr<CDBIterator> pcursor(NewIterator());
+    pcursor->Seek(make_pair(DB_ADDRESSINDEX, CAddressIndexIteratorKey(type, addressHash)));
+
+    bool found = false;
+    std::pair<char, CAddressIndexKey> key;
+    while (pcursor->Valid()) {
+        if (!(pcursor->GetKey(key) && key.first == DB_ADDRESSINDEX && key.second.hashBytes == addressHash))
+            break;
+        if (!found) {
+            firstHeight = key.second.blockHeight;
+            found = true;
+        }
+        lastHeight = key.second.blockHeight;
+        pcursor->Next();
+    }
+    return found;
+}
+
 bool CBlockTreeDB::ReadSpentIndex(CSpentIndexKey &key, CSpentIndexValue &value) {
     return Read(make_pair(DB_SPENTINDEX, key), value);
 }

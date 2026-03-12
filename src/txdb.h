@@ -128,6 +128,7 @@ public:
     bool WriteAddressIndex(const std::vector<CAddressIndexDbEntry> &vect);
     bool EraseAddressIndex(const std::vector<CAddressIndexDbEntry> &vect);
     bool ReadAddressIndex(uint160 addressHash, int type, std::vector<CAddressIndexDbEntry> &addressIndex, int start = 0, int end = 0);
+    bool ReadAddressFirstLastHeight(uint160 addressHash, int type, int &firstHeight, int &lastHeight);
     bool ReadSpentIndex(CSpentIndexKey &key, CSpentIndexValue &value);
     bool UpdateSpentIndex(const std::vector<CSpentIndexDbEntry> &vect);
     bool WriteTimestampIndex(const CTimestampIndexKey &timestampIndex);

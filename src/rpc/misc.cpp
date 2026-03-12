@@ -1103,6 +1103,66 @@ UniValue getaddresstxids(const UniValue& params, bool fHelp)
     return result;
 }
 
+
+UniValue getaddressfirstlastheight(const UniValue& params, bool fHelp)
+{
+    std::string disabledMsg = "";
+    if (!(fExperimentalInsightExplorer || fExperimentalLightWalletd)) {
+        disabledMsg = experimentalDisabledHelpMsg("getaddressfirstlastheight", {"insightexplorer", "lightwalletd"});
+    }
+    if (fHelp || params.size() != 1)
+        throw runtime_error(
+            "getaddressfirstlastheight \"address\"\n"
+            "\nReturns the first and the last block height when given transparent addresses is seen\n"
+            + disabledMsg +
+            "\nArguments:\n"
+            "{\n"
+            "\"address\"  (string) The base58check encoded address\n"
+            "\nResult:\n"
+            "[\n"
+            "  \"firstHeight\"  (int) Block height when address is seen for the first time\n"
+            "  \"lastHeight\"   (int) Block height when address is seen for the last time\n"
+            "]\n"
+            "\nExamples:\n"
+            + HelpExampleCli("getaddressfirstlastheight", "\"tmYXBYJj1K7vhejSec5osXK2QsGa5MTisUQ\"")
+            + HelpExampleRpc("getaddressfirstlastheight", "\"tmYXBYJj1K7vhejSec5osXK2QsGa5MTisUQ\"")
+        );
+
+    if (!(fExperimentalInsightExplorer || fExperimentalLightWalletd)) {
+        throw JSONRPCError(RPC_MISC_ERROR, "Error: getaddressfirstlastheight is disabled. "
+            "Run './ycash-cli help getaddressfirstlastheight' for instructions on how to enable this feature.");
+    }
+
+#ifdef ENABLE_WALLET
+    LOCK2(cs_main, pwalletMain ? &pwalletMain->cs_wallet : NULL);
+#else
+    LOCK(cs_main);
+#endif
+
+    KeyIO keyIO(Params());
+    CTxDestination dest = keyIO.DecodeDestination(params[0].get_str());
+    bool isValid = IsValidDestination(dest);
+
+    int firstHeight = 0;
+    int lastHeight = 0;
+
+    if (isValid)
+    {
+        uint160 hashBytes;
+        int type = 0;
+        if (!getIndexKey(dest, hashBytes, type)) {
+            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid address");
+        }
+        GetAddressFirstLastHeight(hashBytes, type, firstHeight, lastHeight);
+    }
+
+    UniValue ret(UniValue::VOBJ);
+    ret.pushKV("firstHeight", firstHeight);
+    ret.pushKV("lastHeight", lastHeight);
+    return ret;
+}
+
+
 // insightexplorer
 UniValue getspentinfo(const UniValue& params, bool fHelp)
 {
@@ -1223,6 +1283,7 @@ static const CRPCCommand commands[] =
     { "addressindex",       "getaddressdeltas",       &getaddressdeltas,       false }, /* insight explorer */
     { "addressindex",       "getaddressutxos",        &getaddressutxos,        false }, /* insight explorer */
     { "addressindex",       "getaddressmempool",      &getaddressmempool,      true  }, /* insight explorer */
+    { "addressindex",       "getaddressfirstlastheight", &getaddressfirstlastheight, false }, /* insight explorer */
     { "blockchain",         "getspentinfo",           &getspentinfo,           false }, /* insight explorer */
     // END insightexplorer
 
