@@ -96,6 +96,8 @@ public:
 
     void append(Hash obj);
     Hash root() const {
+        if (!left && !right && parents.empty())
+            return emptyroots.empty_root(Depth);
         return root(Depth, std::deque<Hash>());
     }
     Hash last() const;
