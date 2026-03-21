@@ -1133,12 +1133,6 @@ UniValue getaddressfirstlastheight(const UniValue& params, bool fHelp)
             "Run './ycash-cli help getaddressfirstlastheight' for instructions on how to enable this feature.");
     }
 
-#ifdef ENABLE_WALLET
-    LOCK2(cs_main, pwalletMain ? &pwalletMain->cs_wallet : NULL);
-#else
-    LOCK(cs_main);
-#endif
-
     KeyIO keyIO(Params());
     CTxDestination dest = keyIO.DecodeDestination(params[0].get_str());
     bool isValid = IsValidDestination(dest);
