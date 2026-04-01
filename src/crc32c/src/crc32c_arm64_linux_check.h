@@ -31,7 +31,9 @@ extern "C" unsigned long getauxval(unsigned long type) __attribute__((weak));
 namespace crc32c {
 
 inline bool CanUseArm64Linux() {
-#if HAVE_STRONG_GETAUXVAL || HAVE_WEAK_GETAUXVAL
+#if defined(__APPLE__)
+  return true;
+#elif HAVE_STRONG_GETAUXVAL || HAVE_WEAK_GETAUXVAL
   // From 'arch/arm64/include/uapi/asm/hwcap.h' in Linux kernel source code.
   constexpr unsigned long kHWCAP_PMULL = 1 << 4;
   constexpr unsigned long kHWCAP_CRC32 = 1 << 7;
