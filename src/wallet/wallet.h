@@ -23,6 +23,7 @@
 #include "wallet/crypter.h"
 #include "wallet/walletdb.h"
 #include "wallet/rpcwallet.h"
+#include "script/atomicswap.h"
 #include "zcash/Address.hpp"
 #include "zcash/Note.hpp"
 #include "base58.h"
@@ -40,6 +41,206 @@
 #include <boost/shared_ptr.hpp>
 
 extern CWallet* pwalletMain;
+
+/**
+ * Atomic swap status enumeration
+ */
+enum AtomicSwapStatus {
+    SWAP_INITIATED = 0,    // Contract created and funded
+    SWAP_PARTICIPATED = 1, // We participated in someone else's swap
+    SWAP_CLAIMED = 2,      // Funds claimed successfully
+    SWAP_REFUNDED = 3,     // Funds refunded after timeout
+    SWAP_EXPIRED = 4,      // Locktime expired but not yet refunded
+    SWAP_ABANDONED = 5     // User marked as abandoned
+};
+
+/**
+ * Atomic swap role enumeration
+ */
+enum AtomicSwapRole {
+    ROLE_INITIATOR = 0,   // We initiated the swap
+    ROLE_PARTICIPANT = 1  // We are participating in the swap
+};
+
+/**
+ * Complete atomic swap record for wallet storage
+ */
+class CAtomicSwapInfo
+{
+public:
+    static const int CURRENT_VERSION = 1;
+    int nVersion;
+
+    // Basic swap information
+    uint256 contractTxid;           // Transaction ID of the contract
+    uint32_t contractVout;          // Output index
+    CScript redeemScript;           // The HTLC redeem script
+    CAmount amount;                 // Amount locked in contract
+
+    // Contract details
+    AtomicSwapContract contract;    // Parsed contract data
+
+    // Swap metadata
+    AtomicSwapRole role;            // Our role in the swap
+    AtomicSwapStatus status;        // Current status
+    int64_t initiatedTime;          // When we initiated/saw this swap
+    int64_t completedTime;          // When swap was completed (claimed or refunded)
+
+    // Secret information (only for initiator or after claim)
+    std::vector<unsigned char> secret;      // The secret (if known)
+    bool secretKnown;                       // Whether we know the secret
+
+    // Claim/refund transaction (if executed)
+    uint256 spendTxid;              // Txid of claim or refund transaction
+
+    // User metadata
+    std::string label;              // User-defined label
+    std::string counterparty;       // Counterparty identifier (optional)
+
+    CAtomicSwapInfo()
+    {
+        SetNull();
+    }
+
+    CAtomicSwapInfo(
+        const uint256& contractTxid_,
+        uint32_t contractVout_,
+        const CScript& redeemScript_,
+        CAmount amount_,
+        const AtomicSwapContract& contract_,
+        AtomicSwapRole role_)
+        : contractTxid(contractTxid_),
+          contractVout(contractVout_),
+          redeemScript(redeemScript_),
+          amount(amount_),
+          contract(contract_),
+          role(role_)
+    {
+        nVersion = CURRENT_VERSION;
+        status = (role == ROLE_INITIATOR) ? SWAP_INITIATED : SWAP_PARTICIPATED;
+        initiatedTime = GetTime();
+        completedTime = 0;
+        secretKnown = false;
+        spendTxid.SetNull();
+    }
+
+    ADD_SERIALIZE_METHODS;
+
+    template <typename Stream, typename Operation>
+    inline void SerializationOp(Stream& s, Operation ser_action)
+    {
+        READWRITE(nVersion);
+        READWRITE(contractTxid);
+        READWRITE(contractVout);
+        READWRITE(*(CScriptBase*)(&redeemScript));
+        READWRITE(amount);
+
+        // Serialize contract
+        READWRITE(contract.secretHash);
+        READWRITE(contract.recipientPubKeyHash);
+        READWRITE(contract.initiatorPubKeyHash);
+        READWRITE(contract.lockTime);
+
+        // Serialize enums as their underlying int type
+        if (ser_action.ForRead()) {
+            int nRole, nStatus;
+            READWRITE(nRole);
+            READWRITE(nStatus);
+            role = (AtomicSwapRole)nRole;
+            status = (AtomicSwapStatus)nStatus;
+        } else {
+            int nRole = (int)role;
+            int nStatus = (int)status;
+            READWRITE(nRole);
+            READWRITE(nStatus);
+        }
+        READWRITE(initiatedTime);
+        READWRITE(completedTime);
+
+        READWRITE(secret);
+        READWRITE(secretKnown);
+        READWRITE(spendTxid);
+
+        READWRITE(label);
+        READWRITE(counterparty);
+    }
+
+    void SetNull()
+    {
+        nVersion = CURRENT_VERSION;
+        contractTxid.SetNull();
+        contractVout = 0;
+        redeemScript.clear();
+        amount = 0;
+        role = ROLE_INITIATOR;
+        status = SWAP_INITIATED;
+        initiatedTime = 0;
+        completedTime = 0;
+        secret.clear();
+        secretKnown = false;
+        spendTxid.SetNull();
+        label.clear();
+        counterparty.clear();
+    }
+
+    bool IsNull() const
+    {
+        return contractTxid.IsNull();
+    }
+
+    // Get unique identifier for this swap
+    std::string GetSwapId() const
+    {
+        return contractTxid.GetHex() + ":" + std::to_string(contractVout);
+    }
+
+    // Check if swap can be refunded
+    bool CanRefund(int currentHeight, int64_t currentTime) const
+    {
+        if (status != SWAP_INITIATED && status != SWAP_PARTICIPATED && status != SWAP_EXPIRED)
+            return false;
+
+        if (role == ROLE_PARTICIPANT)
+            return false;  // Only initiator can refund
+
+        // Check if locktime reached
+        if (contract.lockTime < LOCKTIME_THRESHOLD) {
+            return currentHeight >= contract.lockTime;
+        } else {
+            return currentTime >= contract.lockTime;
+        }
+    }
+
+    // Check if swap has expired
+    bool HasExpired(int currentHeight, int64_t currentTime) const
+    {
+        if (contract.lockTime < LOCKTIME_THRESHOLD) {
+            return currentHeight >= contract.lockTime;
+        } else {
+            return currentTime >= contract.lockTime;
+        }
+    }
+
+    // Get status as string
+    std::string GetStatusString() const
+    {
+        switch (status) {
+            case SWAP_INITIATED:    return "initiated";
+            case SWAP_PARTICIPATED: return "participated";
+            case SWAP_CLAIMED:      return "claimed";
+            case SWAP_REFUNDED:     return "refunded";
+            case SWAP_EXPIRED:      return "expired";
+            case SWAP_ABANDONED:    return "abandoned";
+            default:                return "unknown";
+        }
+    }
+
+    // Get role as string
+    std::string GetRoleString() const
+    {
+        return (role == ROLE_INITIATOR) ? "initiator" : "participant";
+    }
+};
 
 /**
  * Settings
@@ -873,6 +1074,11 @@ private:
     AsyncRPCOperationId saplingConsolidationOperationId;
 #endif // YCASH_WR
 
+    /**
+     * Atomic swap tracking
+     */
+    std::map<std::string, CAtomicSwapInfo> mapAtomicSwaps;
+
     void AddToTransparentSpends(const COutPoint& outpoint, const uint256& wtxid);
     void AddToSproutSpends(const uint256& nullifier, const uint256& wtxid);
     void AddToSaplingSpends(const uint256& nullifier, const uint256& wtxid);
@@ -1429,6 +1635,22 @@ public:
     bool DelAddressBook(const CTxDestination& address);
 
     void UpdatedTransaction(const uint256 &hashTx);
+
+    /**
+     * Atomic Swap Methods
+     */
+    //! Add atomic swap info to wallet and save to database
+    bool AddAtomicSwap(const CAtomicSwapInfo& swapInfo);
+    //! Update existing atomic swap info
+    bool UpdateAtomicSwap(const CAtomicSwapInfo& swapInfo);
+    //! Load atomic swap info from database
+    bool LoadAtomicSwap(const CAtomicSwapInfo& swapInfo);
+    //! Get atomic swap by swap ID
+    bool GetAtomicSwap(const std::string& swapId, CAtomicSwapInfo& swapInfo) const;
+    //! List all atomic swaps
+    std::vector<CAtomicSwapInfo> ListAtomicSwaps() const;
+    //! Erase atomic swap from wallet
+    bool EraseAtomicSwap(const std::string& swapId);
 
     void GetAddressForMining(MinerAddress &minerAddress);
 

@@ -925,6 +925,18 @@ ReadKeyValue(CWallet* pwallet, CDataStream& ssKey, CDataStream& ssValue,
             ssValue >> chain;
             pwallet->SetHDChain(chain, true);
         }
+        else if (strType == "atomicswap")
+        {
+            std::string swapId;
+            ssKey >> swapId;
+            CAtomicSwapInfo swapInfo;
+            ssValue >> swapInfo;
+            if (!pwallet->LoadAtomicSwap(swapInfo))
+            {
+                strErr = "Error reading wallet database: LoadAtomicSwap failed";
+                return false;
+            }
+        }
     } catch (...)
     {
         return false;
@@ -1417,6 +1429,67 @@ bool CWalletDB::WriteHDChain(const CHDChain& chain)
 {
     nWalletDBUpdateCounter++;
     return Write(std::string("hdchain"), chain);
+}
+
+//
+// Atomic Swap Database Methods
+//
+
+bool CWalletDB::WriteAtomicSwap(const std::string& swapId, const CAtomicSwapInfo& swapInfo)
+{
+    nWalletDBUpdateCounter++;
+    return Write(std::make_pair(std::string("atomicswap"), swapId), swapInfo);
+}
+
+bool CWalletDB::ReadAtomicSwap(const std::string& swapId, CAtomicSwapInfo& swapInfo)
+{
+    return Read(std::make_pair(std::string("atomicswap"), swapId), swapInfo);
+}
+
+bool CWalletDB::EraseAtomicSwap(const std::string& swapId)
+{
+    nWalletDBUpdateCounter++;
+    return Erase(std::make_pair(std::string("atomicswap"), swapId));
+}
+
+bool CWalletDB::ListAtomicSwaps(std::vector<CAtomicSwapInfo>& swaps)
+{
+    swaps.clear();
+
+    Dbc* pcursor = GetCursor();
+    if (!pcursor)
+        return false;
+
+    while (true)
+    {
+        // Read next record
+        CDataStream ssKey(SER_DISK, CLIENT_VERSION);
+        CDataStream ssValue(SER_DISK, CLIENT_VERSION);
+        int ret = ReadAtCursor(pcursor, ssKey, ssValue);
+        if (ret == DB_NOTFOUND)
+            break;
+        else if (ret != 0)
+        {
+            pcursor->close();
+            return false;
+        }
+
+        // Check if this is an atomic swap record
+        std::string strType;
+        ssKey >> strType;
+        if (strType == "atomicswap")
+        {
+            std::string swapId;
+            ssKey >> swapId;
+
+            CAtomicSwapInfo swapInfo;
+            ssValue >> swapInfo;
+            swaps.push_back(swapInfo);
+        }
+    }
+
+    pcursor->close();
+    return true;
 }
 
 void CWalletDB::IncrementUpdateCounter()

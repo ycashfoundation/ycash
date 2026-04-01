@@ -198,6 +198,7 @@ BITCOIN_CORE_H = \
   rpc/server.h \
   rpc/register.h \
   scheduler.h \
+  script/atomicswap.h \
   script/interpreter.h \
   script/script.h \
   script/script_error.h \
@@ -290,6 +291,7 @@ libbitcoin_server_a_SOURCES = \
   policy/policy.cpp \
   pow.cpp \
   rest.cpp \
+  rpc/atomicswap.cpp \
   rpc/blockchain.cpp \
   rpc/mining.cpp \
   rpc/misc.cpp \
@@ -432,6 +434,7 @@ libbitcoin_common_a_SOURCES = \
   protocol.cpp \
   pubkey.cpp \
   scheduler.cpp \
+  script/atomicswap.cpp \
   script/interpreter.cpp \
   script/script.cpp \
   script/script_error.cpp \

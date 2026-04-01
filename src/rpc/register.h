@@ -19,6 +19,19 @@ void RegisterMiscRPCCommands(CRPCTable &tableRPC);
 void RegisterMiningRPCCommands(CRPCTable &tableRPC);
 /** Register raw transaction RPC commands */
 void RegisterRawTransactionRPCCommands(CRPCTable &tableRPC);
+/** Register atomic swap RPC commands */
+void RegisterAtomicSwapRPCCommands(CRPCTable &tableRPC);
+/** Initialize atomic swap database */
+void InitAtomicSwapDatabase();
+/** Shutdown atomic swap database */
+void ShutdownAtomicSwapDatabase();
+class CTransaction;
+/** Monitor transaction for atomic swap spending */
+void MonitorAtomicSwapTransaction(const CTransaction& tx);
+/** Check all swaps for expiration */
+void CheckAtomicSwapExpirations(int currentHeight, int64_t currentTime);
+/** Handle atomic swap disconnect due to chain reorg */
+void HandleAtomicSwapDisconnect(const CTransaction& tx);
 
 static inline void RegisterAllCoreRPCCommands(CRPCTable &tableRPC)
 {
@@ -27,6 +40,7 @@ static inline void RegisterAllCoreRPCCommands(CRPCTable &tableRPC)
     RegisterMiscRPCCommands(tableRPC);
     RegisterMiningRPCCommands(tableRPC);
     RegisterRawTransactionRPCCommands(tableRPC);
+    RegisterAtomicSwapRPCCommands(tableRPC);
 }
 
 #endif // BITCOIN_RPC_REGISTER_H

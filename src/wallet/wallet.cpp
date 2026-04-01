@@ -20,6 +20,7 @@
 #include "policy/policy.h"
 #include "random.h"
 #include "rpc/protocol.h"
+#include "rpc/register.h"
 #include "rpc/server.h"
 #include "script/script.h"
 #include "script/sign.h"
@@ -2904,6 +2905,10 @@ void CWallet::SyncTransaction(const CTransaction& tx, const CBlock* pblock, cons
         return; // Not one of ours
 
     MarkAffectedTransactionsDirty(tx);
+
+    // Monitor for atomic swap activity during chain scanning
+    // This ensures swaps are detected and updated during wallet rescan
+    MonitorAtomicSwapTransaction(tx);
 }
 
 void CWallet::MarkAffectedTransactionsDirty(const CTransaction& tx)
@@ -4522,7 +4527,7 @@ int CWallet::ScanForWalletTransactions(CBlockIndex* pindexStart, bool fUpdate)
 #ifdef YCASH_WR
                     blockInvolvesMe = true;
                     txList.insert(txid);
-#else                    
+#else
                     myTxHashes.push_back(txid);
 #endif // YCASH_WR
                     ret++;
@@ -4532,6 +4537,10 @@ int CWallet::ScanForWalletTransactions(CBlockIndex* pindexStart, bool fUpdate)
                         LogPrintf("ScanForWalletTransactions(): The first significant wtx appeared at height %i. Appropriate \"wallet birthday\" would be %u\n", pindex->nHeight, nRealBirthday);
                     }
                 }
+
+                // Monitor atomic swaps on all transactions during rescan
+                // This ensures we catch claim/refund transactions that occurred while offline
+                MonitorAtomicSwapTransaction(tx);
             }
 
             SproutMerkleTree sproutTree;
@@ -4587,6 +4596,12 @@ int CWallet::ScanForWalletTransactions(CBlockIndex* pindexStart, bool fUpdate)
             }
         }
 #endif // YCASH_WR
+
+        // Check atomic swap expirations after rescan completes
+        // This ensures swaps that expired during offline time are marked correctly
+        if (pindex) {
+            CheckAtomicSwapExpirations(pindex->nHeight, pindex->GetBlockTime());
+        }
 
         ShowProgress(_("Rescanning..."), 100); // hide progress dialog in GUI
         {
@@ -7226,4 +7241,84 @@ KeyAddResult AddSpendingKeyToWallet::operator()(const libzcash::SaplingExtendedS
 
 KeyAddResult AddSpendingKeyToWallet::operator()(const libzcash::InvalidEncoding& no) const {
     throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid spending key");
+}
+
+//
+// Atomic Swap Methods
+//
+
+bool CWallet::AddAtomicSwap(const CAtomicSwapInfo& swapInfo)
+{
+    LOCK(cs_wallet);
+
+    std::string swapId = swapInfo.GetSwapId();
+
+    // Add to memory map
+    mapAtomicSwaps[swapId] = swapInfo;
+
+    // Save to database
+    CWalletDB walletdb(strWalletFile);
+    return walletdb.WriteAtomicSwap(swapId, swapInfo);
+}
+
+bool CWallet::UpdateAtomicSwap(const CAtomicSwapInfo& swapInfo)
+{
+    LOCK(cs_wallet);
+
+    std::string swapId = swapInfo.GetSwapId();
+
+    // Check if exists
+    if (mapAtomicSwaps.find(swapId) == mapAtomicSwaps.end())
+        return false;
+
+    // Update in memory
+    mapAtomicSwaps[swapId] = swapInfo;
+
+    // Update in database
+    CWalletDB walletdb(strWalletFile);
+    return walletdb.WriteAtomicSwap(swapId, swapInfo);
+}
+
+bool CWallet::LoadAtomicSwap(const CAtomicSwapInfo& swapInfo)
+{
+    LOCK(cs_wallet);
+
+    std::string swapId = swapInfo.GetSwapId();
+    mapAtomicSwaps[swapId] = swapInfo;
+    return true;
+}
+
+bool CWallet::GetAtomicSwap(const std::string& swapId, CAtomicSwapInfo& swapInfo) const
+{
+    LOCK(cs_wallet);
+
+    auto it = mapAtomicSwaps.find(swapId);
+    if (it == mapAtomicSwaps.end())
+        return false;
+
+    swapInfo = it->second;
+    return true;
+}
+
+std::vector<CAtomicSwapInfo> CWallet::ListAtomicSwaps() const
+{
+    LOCK(cs_wallet);
+
+    std::vector<CAtomicSwapInfo> swaps;
+    for (const auto& pair : mapAtomicSwaps) {
+        swaps.push_back(pair.second);
+    }
+    return swaps;
+}
+
+bool CWallet::EraseAtomicSwap(const std::string& swapId)
+{
+    LOCK(cs_wallet);
+
+    // Remove from memory
+    mapAtomicSwaps.erase(swapId);
+
+    // Remove from database
+    CWalletDB walletdb(strWalletFile);
+    return walletdb.EraseAtomicSwap(swapId);
 }
