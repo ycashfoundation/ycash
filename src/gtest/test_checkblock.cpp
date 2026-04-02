@@ -78,6 +78,8 @@ protected:
     void TearDown() override {
         // Revert to test default. No-op on mainnet params.
         RegtestDeactivateSapling();
+        UpdateNetworkUpgradeParameters(Consensus::UPGRADE_YCASH, Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT);
+        UpdateNetworkUpgradeParameters(Consensus::UPGRADE_BLOSSOM, Consensus::NetworkUpgrade::NO_ACTIVATION_HEIGHT);
     }
 
     // Returns a valid but empty mutable transaction at block height 1.
@@ -96,11 +98,14 @@ protected:
         mtx.vout[0].scriptPubKey = CScript() << OP_TRUE;
         mtx.vout[0].nValue = 0;
 
-        // Give it a Founder's Reward vout for height 1.
+        // Give it a Founder's/YDF Reward vout for height 1.
         auto rewardScript = Params().GetFoundersRewardScriptAtHeight(1);
-        mtx.vout.push_back(CTxOut(
-                    GetBlockSubsidy(1, Params().GetConsensus())/5,
-                    rewardScript));
+        const auto& consensus = Params().GetConsensus();
+        CAmount subsidy = GetBlockSubsidy(1, consensus);
+        CAmount rewardAmount = consensus.NetworkUpgradeActive(1, Consensus::UPGRADE_YCASH)
+            ? subsidy / 20  // Ycash YDF reward: 5%
+            : subsidy / 5;  // Zcash founders reward: 20%
+        mtx.vout.push_back(CTxOut(rewardAmount, rewardScript));
 
         return mtx;
     }
@@ -242,6 +247,7 @@ TEST_F(ContextualCheckBlockTest, BlockBlossomRulesAcceptBlossomTx) {
     SelectParams(CBaseChainParams::REGTEST);
     UpdateNetworkUpgradeParameters(Consensus::UPGRADE_OVERWINTER, 1);
     UpdateNetworkUpgradeParameters(Consensus::UPGRADE_SAPLING, 1);
+    UpdateNetworkUpgradeParameters(Consensus::UPGRADE_YCASH, 1);
     UpdateNetworkUpgradeParameters(Consensus::UPGRADE_BLOSSOM, 1);
 
     CMutableTransaction mtx = GetFirstBlockCoinbaseTx();
@@ -359,6 +365,7 @@ TEST_F(ContextualCheckBlockTest, BlockBlossomRulesRejectOtherTx) {
     SelectParams(CBaseChainParams::REGTEST);
     UpdateNetworkUpgradeParameters(Consensus::UPGRADE_OVERWINTER, 1);
     UpdateNetworkUpgradeParameters(Consensus::UPGRADE_SAPLING, 1);
+    UpdateNetworkUpgradeParameters(Consensus::UPGRADE_YCASH, 1);
     UpdateNetworkUpgradeParameters(Consensus::UPGRADE_BLOSSOM, 1);
 
     CMutableTransaction mtx = GetFirstBlockCoinbaseTx();

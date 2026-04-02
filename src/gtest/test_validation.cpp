@@ -135,6 +135,7 @@ TEST(Validation, ContextualCheckInputsDetectsOldBranchId) {
     SelectParams(CBaseChainParams::REGTEST);
     UpdateNetworkUpgradeParameters(Consensus::UPGRADE_OVERWINTER, 10);
     UpdateNetworkUpgradeParameters(Consensus::UPGRADE_SAPLING, 20);
+    UpdateNetworkUpgradeParameters(Consensus::UPGRADE_YCASH, 25);
     UpdateNetworkUpgradeParameters(Consensus::UPGRADE_BLOSSOM, 30);
     const Consensus::Params& consensusParams = Params(CBaseChainParams::REGTEST).GetConsensus();
 
@@ -150,6 +151,7 @@ TEST(Validation, ContextualCheckInputsDetectsOldBranchId) {
     // Create a fake block. It doesn't need to contain any transactions; we just
     // need it to be in the global state when our fake view is used.
     CBlock block;
+    block.nTime = GetTime();
     block.hashMerkleRoot = block.BuildMerkleTree();
     auto blockHash = block.GetHash();
     CBlockIndex fakeIndex {block};
@@ -288,4 +290,7 @@ TEST(Validation, ReceivedBlockTransactions) {
         SCOPED_TRACE("ExpectOptionalAmount call");
         ExpectOptionalAmount(30, fakeIndex2.nChainSproutValue);
     }
+
+    // Tear down
+    chainActive.SetTip(NULL);
 }
