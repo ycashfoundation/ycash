@@ -19,6 +19,8 @@ $(package)_cxxflags_freebsd=-fPIC
 ifneq ($(YCASH_TOOLCHAIN), GCC)
   ifeq ($(host_os),freebsd)
     $(package)_ldflags+=-static-libstdc++ -lcxxrt
+  else ifeq ($(host_os),mingw32)
+    $(package)_ldflags+=-lc++ -lc++abi -lunwind
   else
     $(package)_ldflags+=-static-libstdc++ -lc++abi
   endif

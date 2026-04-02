@@ -4352,7 +4352,7 @@ bool CheckBlock(const CBlock& block,
         return state.DoS(100, error("CheckBlock(): out-of-bounds SigOpCount"),
                          REJECT_INVALID, "bad-blk-sigops", true);
 
-    if (fCheckPOW && fCheckMerkleRoot)
+    if (fCheckPOW && fCheckMerkleRoot && verifier.IsStrict())
         block.fChecked = true;
 
     return true;

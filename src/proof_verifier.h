@@ -32,6 +32,9 @@ public:
     // such as during reindexing.
     static ProofVerifier Disabled();
 
+    // Returns true if this verifier strictly verifies proofs.
+    bool IsStrict() const { return perform_verification; }
+
     // Verifies that the JoinSplit proof is correct.
     bool VerifySprout(
         const JSDescription& jsdesc,

@@ -23,6 +23,8 @@ define $(package)_set_vars
   ifneq ($(YCASH_TOOLCHAIN), GCC)
     ifeq ($(host_os),freebsd)
       $(package)_ldflags+=-static-libstdc++ -lcxxrt
+    else ifeq ($(host_os),mingw32)
+      $(package)_ldflags+=-lc++ -lc++abi -lunwind
     else
       $(package)_ldflags+=-static-libstdc++ -lc++abi
     endif
@@ -49,3 +51,10 @@ endef
 define $(package)_postprocess_cmds
   rm -rf bin share lib/*.la
 endef
+
+ifeq ($(host_os),mingw32)
+define $(package)_postprocess_cmds
+  rm -rf bin share lib/*.la && \
+  sed -i 's/ -lstdc++//' lib/pkgconfig/libzmq.pc
+endef
+endif

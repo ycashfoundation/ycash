@@ -1064,10 +1064,15 @@ else
        [AC_MSG_WARN([zmq.h not found, disabling zmq support])
         use_zmq=no
         AC_DEFINE([ENABLE_ZMQ],[0],[Define to 1 to enable ZMQ functions])])
-     AC_CHECK_LIB([zmq],[zmq_ctx_shutdown],ZMQ_LIBS=-lzmq,
+     case $host in
+       *mingw*) zmq_extra_libs="-lws2_32 -liphlpapi -lwinpthread" ;;
+       *)       zmq_extra_libs="" ;;
+     esac
+     AC_CHECK_LIB([zmq],[zmq_ctx_shutdown],ZMQ_LIBS="-lzmq $zmq_extra_libs",
        [AC_MSG_WARN([libzmq >= 4.0 not found, disabling zmq support])
         use_zmq=no
-        AC_DEFINE([ENABLE_ZMQ],[0],[Define to 1 to enable ZMQ functions])])
+        AC_DEFINE([ENABLE_ZMQ],[0],[Define to 1 to enable ZMQ functions])],
+       [$zmq_extra_libs])
   else
     AC_DEFINE_UNQUOTED([ENABLE_ZMQ],[0],[Define to 1 to enable ZMQ functions])
   fi
