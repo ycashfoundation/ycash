@@ -25,7 +25,7 @@ endef
 
 define fetch_file
 (test -f $$($(1)_source_dir)/$(4) || \
-  ( mkdir -p $$($(1)_download_dir) && echo Fetching $(1)... && \
+  ( mkdir -p $$($(1)_download_dir) && echo Fetching $(1)... && echo "  URL: $(2)/$(3)" && \
   ( $(call download_and_check_file,$$($(1)_download_dir),$(4),"$(2)/$(3)",$(5)) || \
     $(call download_and_check_file,$$($(1)_download_dir),$(4),"$(FALLBACK_DOWNLOAD_PATH)/$(4)",$(5)) ) && \
     mv $$($(1)_download_dir)/$(4).temp $$($(1)_source_dir)/$(4) && \

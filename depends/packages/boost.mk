@@ -40,10 +40,13 @@ $(package)_config_libraries=chrono,filesystem,program_options,system,thread,test
 $(package)_cxxflags+=-std=c++17 -fvisibility=hidden
 $(package)_cxxflags_linux=-fPIC
 $(package)_cxxflags_freebsd=-fPIC
+# $(package)_cxxflags_mingw32=-D_GLIBCXX_USE_C99_MATH
 
 ifneq ($(YCASH_TOOLCHAIN), GCC)
   ifeq ($(host_os),freebsd)
     $(package)_ldflags+=-static-libstdc++ -lcxxrt
+  else ifeq ($(host_os),mingw32)
+    $(package)_ldflags+=-lc++ -lc++abi -lunwind
   else
     $(package)_ldflags+=-static-libstdc++ -lc++abi
   endif

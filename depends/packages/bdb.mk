@@ -23,11 +23,13 @@ endif
 $(package)_config_opts_aarch64=--disable-atomicsupport
 $(package)_cxxflags+=-std=c++17
 
-$(package)_cflags_mingw32+=-fno-builtin-stpcpy
+$(package)_cflags_mingw32+=-fno-builtin-stpcpy -Wno-deprecated-non-prototype
 
 ifneq ($(YCASH_TOOLCHAIN), GCC)
   ifeq ($(host_os),freebsd)
     $(package)_ldflags+=-static-libstdc++ -lcxxrt
+  else ifeq ($(host_os),mingw32)
+    $(package)_ldflags+=-lc++ -lc++abi -lunwind
   else
     $(package)_ldflags+=-static-libstdc++ -lc++abi
   endif

@@ -2,8 +2,9 @@ mingw32_CFLAGS=-pipe
 mingw32_CXXFLAGS=$(mingw32_CFLAGS)
 
 ifneq ($(YCASH_TOOLCHAIN), GCC)
-  mingw32_CXXFLAGS += -isystem $(host_prefix)/include/c++/v1
-  mingw32_LDFLAGS?=-fuse-ld=lld
+  mingw32_CXX = clang++ -target $(host) -B$(build_prefix)/bin
+  mingw32_CXXFLAGS += -nostdinc++ -isystem $(host_prefix)/include/c++/v1
+  mingw32_LDFLAGS?=-fuse-ld=lld -nostdlib++
 else
   mingw32_CC = $(host_toolchain)gcc-posix
   mingw32_CXX = $(host_toolchain)g++-posix

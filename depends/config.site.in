@@ -42,6 +42,8 @@ if test x$YCASH_TOOLCHAIN = xGCC; then
 else
   if test x@host_os@ = xfreebsd; then
     LDFLAGS="-L$depends_prefix/lib $LDFLAGS -static-libstdc++ -lcxxrt"
+  elif test x@host_os@ = xmingw32; then
+    LDFLAGS="-L$depends_prefix/lib $LDFLAGS -nostdlib++ -lc++ -lc++abi -lunwind -lmsvcrt -lucrt"
   else
     LDFLAGS="-L$depends_prefix/lib $LDFLAGS -static-libstdc++ -lc++abi"
   fi
