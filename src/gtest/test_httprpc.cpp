@@ -6,6 +6,8 @@
 
 using ::testing::Return;
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Winconsistent-missing-override"
 class MockHTTPRequest : public HTTPRequest {
 public:
     MOCK_METHOD0(GetPeer, CService());
@@ -13,6 +15,9 @@ public:
     MOCK_METHOD1(GetHeader, std::pair<bool, std::string>(const std::string& hdr));
     MOCK_METHOD2(WriteHeader, void(const std::string& hdr, const std::string& value));
     MOCK_METHOD2(WriteReply, void(int nStatus, const std::string& strReply));
+    void WriteReply(int nStatus, std::string&& strReply) override {
+        WriteReply(nStatus, static_cast<const std::string&>(strReply));
+    }
 
     MockHTTPRequest() : HTTPRequest(nullptr) {}
     void CleanUp() {
@@ -20,6 +25,7 @@ public:
         replySent = true;
     }
 };
+#pragma clang diagnostic pop
 
 TEST(HTTPRPC, FailsOnGET) {
     MockHTTPRequest req;
