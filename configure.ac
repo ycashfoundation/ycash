@@ -1087,6 +1087,18 @@ else
   fi
 fi
 
+if test x$use_pkgconfig = xyes; then
+  m4_ifdef(
+    [PKG_CHECK_MODULES],
+    [
+      PKG_CHECK_MODULES([ZLIB],[zlib],, [AC_MSG_ERROR(zlib not found.)])
+    ]
+  )
+else
+  AC_CHECK_HEADER([zlib.h],, AC_MSG_ERROR(zlib headers missing),)
+  AC_CHECK_LIB([z],[compress2],ZLIB_LIBS=-lz,AC_MSG_ERROR(zlib missing))
+fi
+
 RUST_LIBS=""
 case $host in
   *mingw*)
@@ -1243,6 +1255,8 @@ AC_SUBST(TESTDEFS)
 AC_SUBST(EVENT_LIBS)
 AC_SUBST(EVENT_PTHREADS_LIBS)
 AC_SUBST(ZMQ_LIBS)
+AC_SUBST(ZLIB_LIBS)
+AC_SUBST(ZLIB_CFLAGS)
 AC_SUBST(HAVE_GMTIME_R)
 AC_SUBST(LIBZCASH_LIBS)
 AC_SUBST(HAVE_FDATASYNC)

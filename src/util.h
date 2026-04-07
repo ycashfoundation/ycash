@@ -211,4 +211,11 @@ template <typename Callable> void TraceThread(const char* name,  Callable func)
     }
 }
 
+/**
+ * Trim glibc malloc heap to return freed memory to the OS.
+ * No-op on non-glibc platforms. Logs elapsed time via LogPrint("malloc_trim").
+ * Only call after large allocations have been freed (e.g. large RPC responses).
+ */
+void TrimMallocHeap(const char* context = nullptr);
+
 #endif // BITCOIN_UTIL_H

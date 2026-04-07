@@ -719,7 +719,7 @@ UniValue getblocktemplate(const UniValue& params, bool fHelp)
             if (setTxIndex.count(in.prevout.hash))
                 deps.push_back(setTxIndex[in.prevout.hash]);
         }
-        entry.pushKV("depends", deps);
+        entry.pushKV("depends", std::move(deps));
 
         int index_in_template = i - 1;
         entry.pushKV("fee", pblocktemplate->vTxFees[index_in_template]);
@@ -734,7 +734,7 @@ UniValue getblocktemplate(const UniValue& params, bool fHelp)
             entry.pushKV("required", nextHeight < Params().GetYdfMandateEndHeight());
             txCoinbase = entry;
         } else {
-            transactions.push_back(entry);
+            transactions.push_back(std::move(entry));
         }
     }
 
@@ -1017,7 +1017,7 @@ UniValue getblocksubsidy(const UniValue& params, bool fHelp)
             }
 
             fsobj.pushKV("address", addressStr);
-            fundingstreams.push_back(fsobj);
+            fundingstreams.push_back(std::move(fsobj));
         }
         result.pushKV("fundingstreams", fundingstreams);
     }

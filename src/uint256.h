@@ -8,6 +8,7 @@
 
 #include <assert.h>
 #include <cstring>
+#include <functional>
 #include <stdexcept>
 #include <stdint.h>
 #include <string>
@@ -163,6 +164,15 @@ inline uint256 uint256S(const std::string& str)
     uint256 rv;
     rv.SetHex(str);
     return rv;
+}
+
+namespace std {
+    template<>
+    struct hash<uint256> {
+        size_t operator()(const uint256& h) const {
+            return static_cast<size_t>(h.GetCheapHash());
+        }
+    };
 }
 
 #endif // BITCOIN_UINT256_H

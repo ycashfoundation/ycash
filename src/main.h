@@ -481,6 +481,8 @@ bool GetAddressIndex(const uint160& addressHash, int type,
         int start = 0, int end = 0);
 bool GetAddressUnspent(const uint160& addressHash, int type,
         std::vector<CAddressUnspentDbEntry>& unspentOutputs);
+bool GetAddressFirstLastHeight(const uint160& addressHash, int type,
+        int& firstHeight, int& lastHeight);
 bool GetTimestampIndex(unsigned int high, unsigned int low, bool fActiveOnly,
     std::vector<std::pair<uint256, unsigned int> > &hashes);
 

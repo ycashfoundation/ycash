@@ -598,9 +598,11 @@ public:
         UNKNOWN = 0,
         P2PKH = 1,
         P2SH = 2,
+        P2PK = 3,
     };
     bool IsPayToPublicKeyHash() const;
     bool IsPayToScriptHash() const;
+    bool IsPayToPublicKey() const;
     ScriptType GetType() const;
     uint160 AddressHash() const;
 

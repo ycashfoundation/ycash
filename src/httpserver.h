@@ -113,6 +113,7 @@ public:
      * main thread, do not call any other HTTPRequest methods after calling this.
      */
     virtual void WriteReply(int nStatus, const std::string& strReply = "");
+    virtual void WriteReply(int nStatus, std::string&& strReply);
 };
 
 /** Event handler closure.

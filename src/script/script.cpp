@@ -218,6 +218,21 @@ bool CScript::IsPayToScriptHash() const
             (*this)[22] == OP_EQUAL);
 }
 
+bool CScript::IsPayToPublicKey() const
+{
+    // Test for pay-to-pubkey CScript with both
+    // compressed or uncompressed pubkey
+    if (this->size() == 35) {
+        return ((*this)[1] == 0x02 || (*this)[1] == 0x03) &&
+                (*this)[34] == OP_CHECKSIG;
+    }
+    if (this->size() == 67) {
+        return (*this)[1] == 0x04 &&
+                (*this)[66] == OP_CHECKSIG;
+    }
+    return false;
+}
+
 bool CScript::IsPushOnly(const_iterator pc) const
 {
     while (pc < end())
@@ -247,6 +262,8 @@ CScript::ScriptType CScript::GetType() const
         return CScript::P2PKH;
     if (this->IsPayToScriptHash())
         return CScript::P2SH;
+    if (this->IsPayToPublicKey())
+        return CScript::P2PK;
     // We don't know this script type
     return CScript::UNKNOWN;
 }

@@ -10,12 +10,14 @@
 #include "consensus/validation.h"
 #include "main.h"
 #include "policy/fees.h"
+#include "script/script.h"
 #include "streams.h"
 #include "timedata.h"
 #include "util.h"
 #include "utilmoneystr.h"
 #include "validationinterface.h"
 #include "version.h"
+#include "hash.h"
 
 #include <optional>
 
@@ -142,10 +144,22 @@ void CTxMemPool::addAddressIndex(const CTxMemPoolEntry &entry, const CCoinsViewC
         CScript::ScriptType type = prevout.scriptPubKey.GetType();
         if (type == CScript::UNKNOWN)
             continue;
-        CMempoolAddressDeltaKey key(type, prevout.scriptPubKey.AddressHash(), txhash, j, 1);
-        CMempoolAddressDelta delta(entry.GetTime(), prevout.nValue * -1, input.prevout.hash, input.prevout.n);
-        mapAddress.insert(make_pair(key, delta));
-        inserted.push_back(key);
+        if (type == CScript::P2PK)
+        {
+            // mimic P2PKH
+            uint160 hashBytes(Hash160(prevout.scriptPubKey.begin()+1, prevout.scriptPubKey.end()-1));
+            CMempoolAddressDeltaKey key(CScript::P2PKH, hashBytes, txhash, j, 1);
+            CMempoolAddressDelta delta(entry.GetTime(), prevout.nValue * -1, input.prevout.hash, input.prevout.n);
+            mapAddress.insert(make_pair(key, delta));
+            inserted.push_back(key);
+        }
+        else
+        {
+            CMempoolAddressDeltaKey key(type, prevout.scriptPubKey.AddressHash(), txhash, j, 1);
+            CMempoolAddressDelta delta(entry.GetTime(), prevout.nValue * -1, input.prevout.hash, input.prevout.n);
+            mapAddress.insert(make_pair(key, delta));
+            inserted.push_back(key);
+        }
     }
 
     for (unsigned int j = 0; j < tx.vout.size(); j++) {
@@ -153,9 +167,21 @@ void CTxMemPool::addAddressIndex(const CTxMemPoolEntry &entry, const CCoinsViewC
         CScript::ScriptType type = out.scriptPubKey.GetType();
         if (type == CScript::UNKNOWN)
             continue;
-        CMempoolAddressDeltaKey key(type, out.scriptPubKey.AddressHash(), txhash, j, 0);
-        mapAddress.insert(make_pair(key, CMempoolAddressDelta(entry.GetTime(), out.nValue)));
-        inserted.push_back(key);
+        if (type == CScript::P2PK)
+        {
+            // mimic P2PKH
+            uint160 hashBytes(Hash160(out.scriptPubKey.begin()+1, out.scriptPubKey.end()-1));
+            //std::pair<addressDeltaMap::iterator,bool> ret;
+            CMempoolAddressDeltaKey key(CScript::P2PKH, hashBytes, txhash, j, 0);
+            mapAddress.insert(make_pair(key, CMempoolAddressDelta(entry.GetTime(), out.nValue)));
+            inserted.push_back(key);
+        }
+        else
+        {
+            CMempoolAddressDeltaKey key(type, out.scriptPubKey.AddressHash(), txhash, j, 0);
+            mapAddress.insert(make_pair(key, CMempoolAddressDelta(entry.GetTime(), out.nValue)));
+            inserted.push_back(key);
+        }
     }
 
     mapAddressInserted.insert(make_pair(txhash, inserted));
@@ -200,10 +226,22 @@ void CTxMemPool::addSpentIndex(const CTxMemPoolEntry &entry, const CCoinsViewCac
     for (unsigned int j = 0; j < tx.vin.size(); j++) {
         const CTxIn input = tx.vin[j];
         const CTxOut &prevout = view.GetOutputFor(input);
+        int address_type = prevout.scriptPubKey.GetType();
+        uint160 address_hash;
+
+        if (address_type == CScript::P2PK)
+        {
+            // mimic P2PKH
+            address_type = CScript::P2PKH;
+            address_hash = Hash160(prevout.scriptPubKey.begin()+1, prevout.scriptPubKey.end()-1);
+        }
+        else
+        {
+            address_hash = prevout.scriptPubKey.AddressHash();
+        }
+
         CSpentIndexKey key = CSpentIndexKey(input.prevout.hash, input.prevout.n);
-        CSpentIndexValue value = CSpentIndexValue(txhash, j, -1, prevout.nValue,
-            prevout.scriptPubKey.GetType(),
-            prevout.scriptPubKey.AddressHash());
+        CSpentIndexValue value = CSpentIndexValue(txhash, j, -1, prevout.nValue, address_type, address_hash);
         mapSpent.insert(make_pair(key, value));
         inserted.push_back(key);
     }

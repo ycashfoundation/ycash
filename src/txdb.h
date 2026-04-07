@@ -112,12 +112,13 @@ private:
     CBlockTreeDB(const CBlockTreeDB&);
     void operator=(const CBlockTreeDB&);
 public:
-    bool WriteBatchSync(const std::vector<std::pair<int, const CBlockFileInfo*> >& fileInfo, int nLastFile, const std::vector<const CBlockIndex*>& blockinfo);
+    bool WriteBatchSync(const std::vector<std::pair<int, const CBlockFileInfo*> >& fileInfo, int nLastFile, const std::vector<CBlockIndex*>& blockinfo);
     bool EraseBatchSync(const std::vector<const CBlockIndex*>& blockinfo);
     bool ReadBlockFileInfo(int nFile, CBlockFileInfo &info);
     bool ReadLastBlockFile(int &nFile);
     bool WriteReindexing(bool fReindexing);
     bool ReadReindexing(bool &fReindexing);
+    bool ReadDiskBlockIndex(const uint256 &blockhash, CDiskBlockIndex &dbindex);
     bool ReadTxIndex(const uint256 &txid, CDiskTxPos &pos);
     bool WriteTxIndex(const std::vector<std::pair<uint256, CDiskTxPos> > &vect);
 
@@ -127,6 +128,7 @@ public:
     bool WriteAddressIndex(const std::vector<CAddressIndexDbEntry> &vect);
     bool EraseAddressIndex(const std::vector<CAddressIndexDbEntry> &vect);
     bool ReadAddressIndex(uint160 addressHash, int type, std::vector<CAddressIndexDbEntry> &addressIndex, int start = 0, int end = 0);
+    bool ReadAddressFirstLastHeight(uint160 addressHash, int type, int &firstHeight, int &lastHeight);
     bool ReadSpentIndex(CSpentIndexKey &key, CSpentIndexValue &value);
     bool UpdateSpentIndex(const std::vector<CSpentIndexDbEntry> &vect);
     bool WriteTimestampIndex(const CTimestampIndexKey &timestampIndex);

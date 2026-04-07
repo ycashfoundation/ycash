@@ -161,7 +161,7 @@ UniValue getpeerinfo(const UniValue& params, bool fHelp)
         obj.pushKV("addr_rate_limited", stats.m_addr_rate_limited);
         obj.pushKV("whitelisted", stats.fWhitelisted);
 
-        ret.push_back(obj);
+        ret.push_back(std::move(obj));
     }
 
     return ret;
@@ -302,7 +302,7 @@ UniValue getaddednodeinfo(const UniValue& params, bool fHelp)
         for (const std::string& strAddNode : laddedNodes) {
             UniValue obj(UniValue::VOBJ);
             obj.pushKV("addednode", strAddNode);
-            ret.push_back(obj);
+            ret.push_back(std::move(obj));
         }
         return ret;
     }
@@ -345,11 +345,11 @@ UniValue getaddednodeinfo(const UniValue& params, bool fHelp)
             }
             if (!fFound)
                 node.pushKV("connected", "false");
-            addresses.push_back(node);
+            addresses.push_back(std::move(node));
         }
         obj.pushKV("connected", fConnected);
         obj.pushKV("addresses", addresses);
-        ret.push_back(obj);
+        ret.push_back(std::move(obj));
     }
 
     return ret;
@@ -420,7 +420,7 @@ static UniValue GetNetworksInfo()
         obj.pushKV("reachable", IsReachable(network));
         obj.pushKV("proxy", proxy.IsValid() ? proxy.proxy.ToStringIPPort() : string());
         obj.pushKV("proxy_randomize_credentials", proxy.randomize_credentials);
-        networks.push_back(obj);
+        networks.push_back(std::move(obj));
     }
     return networks;
 }
@@ -511,7 +511,7 @@ UniValue getnetworkinfo(const UniValue& params, bool fHelp)
             rec.pushKV("address", item.first.ToString());
             rec.pushKV("port", item.second.nPort);
             rec.pushKV("score", item.second.nScore);
-            localAddresses.push_back(rec);
+            localAddresses.push_back(std::move(rec));
         }
     }
     obj.pushKV("localaddresses", localAddresses);
@@ -604,7 +604,7 @@ UniValue listbanned(const UniValue& params, bool fHelp)
         rec.pushKV("ban_created", banEntry.nCreateTime);
         rec.pushKV("ban_reason", banEntry.banReasonToString());
 
-        bannedAddresses.push_back(rec);
+        bannedAddresses.push_back(std::move(rec));
     }
 
     return bannedAddresses;

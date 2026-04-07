@@ -432,5 +432,8 @@ int main(int argc, char* argv[])
     } catch (...) {
         PrintExceptionContinue(NULL, "CommandLineRPC()");
     }
+
+    TrimMallocHeap("bitcoin-cli");
+
     return ret;
 }

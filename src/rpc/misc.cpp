@@ -12,6 +12,7 @@
 #include "netbase.h"
 #include "rpc/server.h"
 #include "txmempool.h"
+#include "uint256.h"
 #include "util.h"
 #ifdef ENABLE_WALLET
 #include "wallet/wallet.h"
@@ -20,6 +21,7 @@
 
 #include <stdint.h>
 #include <variant>
+#include <unordered_set>
 
 #include <boost/assign/list_of.hpp>
 
@@ -662,7 +664,7 @@ UniValue getaddressmempool(const UniValue& params, bool fHelp)
             delta.pushKV("prevtxid", it.second.prevhash.GetHex());
             delta.pushKV("prevout", (int)it.second.prevout);
         }
-        result.push_back(delta);
+        result.push_back(std::move(delta));
     }
     return result;
 }
@@ -763,7 +765,7 @@ UniValue getaddressutxos(const UniValue& params, bool fHelp)
         output.pushKV("script", HexStr(it.second.script.begin(), it.second.script.end()));
         output.pushKV("satoshis", it.second.satoshis);
         output.pushKV("height", it.second.blockHeight);
-        utxos.push_back(output);
+        utxos.push_back(std::move(output));
     }
 
     if (!includeChainInfo)
@@ -910,29 +912,50 @@ UniValue getaddressdeltas(const UniValue& params, bool fHelp)
         }
     }
 
+    // optimization for the most common case (scan for a single address)
+    int first_type = 0;
+    uint160 first_hashBytes = uint160();
+    std::string first_address;
+
+    if (addressIndex.size() > 0)
+    {
+        first_type = addressIndex[0].first.type;
+        first_hashBytes = addressIndex[0].first.hashBytes;
+        if (!getAddressFromIndex(first_type, first_hashBytes, first_address))
+        {
+            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Unknown address type");
+        }
+    }
+
     UniValue deltas(UniValue::VARR);
-    for (const auto& it : addressIndex) {
+    deltas.reserve(addressIndex.size());
+    for (const auto& [indexKey, indexDelta] : addressIndex) {
         std::string address;
-        if (!getAddressFromIndex(it.first.type, it.first.hashBytes, address)) {
+
+        if (indexKey.type == first_type && indexKey.hashBytes == first_hashBytes)
+        {
+            address = first_address;
+        }
+        else if (!getAddressFromIndex(indexKey.type, indexKey.hashBytes, address))
+        {
             throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Unknown address type");
         }
 
         UniValue delta(UniValue::VOBJ);
         delta.pushKV("address", address);
-        delta.pushKV("blockindex", (int)it.first.txindex);
-        delta.pushKV("height", it.first.blockHeight);
-        delta.pushKV("index", (int)it.first.index);
-        delta.pushKV("satoshis", it.second);
-        delta.pushKV("txid", it.first.txhash.GetHex());
-        deltas.push_back(delta);
+        delta.pushKV("blockindex", (int)indexKey.txindex);
+        delta.pushKV("height", indexKey.blockHeight);
+        delta.pushKV("index", (int)indexKey.index);
+        delta.pushKV("satoshis", indexDelta);
+        delta.pushKV("txid", indexKey.txhash.GetHex());
+        deltas.push_back(std::move(delta));
     }
-
-    UniValue result(UniValue::VOBJ);
 
     if (!(includeChainInfo && start > 0 && end > 0)) {
         return deltas;
     }
 
+    UniValue result(UniValue::VOBJ);
     UniValue startInfo(UniValue::VOBJ);
     UniValue endInfo(UniValue::VOBJ);
     {
@@ -998,15 +1021,20 @@ UniValue getaddressbalance(const UniValue& params, bool fHelp)
 
     CAmount balance = 0;
     CAmount received = 0;
+    std::unordered_set<uint256> txids;
+    txids.reserve(addressIndex.size() / 2);
+
     for (const auto& it : addressIndex) {
         if (it.second > 0) {
             received += it.second;
         }
         balance += it.second;
+        txids.insert(it.first.txhash);
     }
     UniValue result(UniValue::VOBJ);
     result.pushKV("balance", balance);
     result.pushKV("received", received);
+    result.pushKV("txcount", txids.size());
     return result;
 }
 
@@ -1074,6 +1102,60 @@ UniValue getaddresstxids(const UniValue& params, bool fHelp)
     }
     return result;
 }
+
+
+UniValue getaddressfirstlastheight(const UniValue& params, bool fHelp)
+{
+    std::string disabledMsg = "";
+    if (!(fExperimentalInsightExplorer || fExperimentalLightWalletd)) {
+        disabledMsg = experimentalDisabledHelpMsg("getaddressfirstlastheight", {"insightexplorer", "lightwalletd"});
+    }
+    if (fHelp || params.size() != 1)
+        throw runtime_error(
+            "getaddressfirstlastheight \"address\"\n"
+            "\nReturns the first and the last block height when given transparent addresses is seen\n"
+            + disabledMsg +
+            "\nArguments:\n"
+            "{\n"
+            "\"address\"  (string) The base58check encoded address\n"
+            "\nResult:\n"
+            "[\n"
+            "  \"firstHeight\"  (int) Block height when address is seen for the first time\n"
+            "  \"lastHeight\"   (int) Block height when address is seen for the last time\n"
+            "]\n"
+            "\nExamples:\n"
+            + HelpExampleCli("getaddressfirstlastheight", "\"tmYXBYJj1K7vhejSec5osXK2QsGa5MTisUQ\"")
+            + HelpExampleRpc("getaddressfirstlastheight", "\"tmYXBYJj1K7vhejSec5osXK2QsGa5MTisUQ\"")
+        );
+
+    if (!(fExperimentalInsightExplorer || fExperimentalLightWalletd)) {
+        throw JSONRPCError(RPC_MISC_ERROR, "Error: getaddressfirstlastheight is disabled. "
+            "Run './ycash-cli help getaddressfirstlastheight' for instructions on how to enable this feature.");
+    }
+
+    KeyIO keyIO(Params());
+    CTxDestination dest = keyIO.DecodeDestination(params[0].get_str());
+    bool isValid = IsValidDestination(dest);
+
+    int firstHeight = 0;
+    int lastHeight = 0;
+
+    if (isValid)
+    {
+        uint160 hashBytes;
+        int type = 0;
+        if (!getIndexKey(dest, hashBytes, type)) {
+            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid address");
+        }
+        GetAddressFirstLastHeight(hashBytes, type, firstHeight, lastHeight);
+    }
+
+    UniValue ret(UniValue::VOBJ);
+    ret.pushKV("firstHeight", firstHeight);
+    ret.pushKV("lastHeight", lastHeight);
+    return ret;
+}
+
 
 // insightexplorer
 UniValue getspentinfo(const UniValue& params, bool fHelp)
@@ -1195,6 +1277,7 @@ static const CRPCCommand commands[] =
     { "addressindex",       "getaddressdeltas",       &getaddressdeltas,       false }, /* insight explorer */
     { "addressindex",       "getaddressutxos",        &getaddressutxos,        false }, /* insight explorer */
     { "addressindex",       "getaddressmempool",      &getaddressmempool,      true  }, /* insight explorer */
+    { "addressindex",       "getaddressfirstlastheight", &getaddressfirstlastheight, false }, /* insight explorer */
     { "blockchain",         "getspentinfo",           &getspentinfo,           false }, /* insight explorer */
     // END insightexplorer
 

@@ -336,14 +336,29 @@ bool CCoinsViewDB::GetStats(CCoinsStats &stats) const {
     return true;
 }
 
-bool CBlockTreeDB::WriteBatchSync(const std::vector<std::pair<int, const CBlockFileInfo*> >& fileInfo, int nLastFile, const std::vector<const CBlockIndex*>& blockinfo) {
+bool CBlockTreeDB::WriteBatchSync(const std::vector<std::pair<int, const CBlockFileInfo*> >& fileInfo, int nLastFile, const std::vector<CBlockIndex*>& blockinfo) {
     CDBBatch batch(*this);
     for (std::vector<std::pair<int, const CBlockFileInfo*> >::const_iterator it=fileInfo.begin(); it != fileInfo.end(); it++) {
         batch.Write(make_pair(DB_BLOCK_FILES, it->first), *it->second);
     }
     batch.Write(DB_LAST_BLOCK, nLastFile);
     for (std::vector<const CBlockIndex*>::const_iterator it=blockinfo.begin(); it != blockinfo.end(); it++) {
-        batch.Write(make_pair(DB_BLOCK_INDEX, (*it)->GetBlockHash()), CDiskBlockIndex(*it));
+        std::pair<char, uint256> key = make_pair(DB_BLOCK_INDEX, (*it)->GetBlockHash());
+        try {
+            CDiskBlockIndex dbindex {*it, [this, &key]() {
+                // It can happen that the index entry is written, then the Equihash solution is cleared from memory,
+                // then the index entry is rewritten. In that case we must read the solution from the old entry.
+                CDiskBlockIndex dbindex_old;
+                if (!Read(key, dbindex_old)) {
+                    LogPrintf("%s: Failed to read index entry", __func__);
+                    throw runtime_error("Failed to read index entry");
+                }
+                return dbindex_old.GetSolution();
+            }};
+            batch.Write(key, dbindex);
+        } catch (const runtime_error&) {
+            return false;
+        }
     }
     return WriteBatch(batch, true);
 }
@@ -354,6 +369,10 @@ bool CBlockTreeDB::EraseBatchSync(const std::vector<const CBlockIndex*>& blockin
         batch.Erase(make_pair(DB_BLOCK_INDEX, (*it)->GetBlockHash()));
     }
     return WriteBatch(batch, true);
+}
+
+bool CBlockTreeDB::ReadDiskBlockIndex(const uint256 &blockhash, CDiskBlockIndex &dbindex) {
+    return Read(make_pair(DB_BLOCK_INDEX, blockhash), dbindex);
 }
 
 bool CBlockTreeDB::ReadTxIndex(const uint256 &txid, CDiskTxPos &pos) {
@@ -421,7 +440,7 @@ bool CBlockTreeDB::ReadAddressIndex(
         std::vector<CAddressIndexDbEntry> &addressIndex,
         int start, int end)
 {
-    boost::scoped_ptr<CDBIterator> pcursor(NewIterator());
+    std::unique_ptr<CDBIterator> pcursor(NewIterator());
 
     if (start > 0 && end > 0) {
         pcursor->Seek(make_pair(DB_ADDRESSINDEX, CAddressIndexIteratorHeightKey(type, addressHash, start)));
@@ -429,8 +448,9 @@ bool CBlockTreeDB::ReadAddressIndex(
         pcursor->Seek(make_pair(DB_ADDRESSINDEX, CAddressIndexIteratorKey(type, addressHash)));
     }
 
+    addressIndex.reserve(addressIndex.size() + 16384);
+
     while (pcursor->Valid()) {
-        boost::this_thread::interruption_point();
         std::pair<char,CAddressIndexKey> key;
         if (!(pcursor->GetKey(key) && key.first == DB_ADDRESSINDEX && key.second.hashBytes == addressHash))
             break;
@@ -439,10 +459,30 @@ bool CBlockTreeDB::ReadAddressIndex(
         CAmount nValue;
         if (!pcursor->GetValue(nValue))
             return error("failed to get address index value");
-        addressIndex.push_back(make_pair(key.second, nValue));
+        addressIndex.emplace_back(key.second, nValue);
         pcursor->Next();
     }
     return true;
+}
+
+bool CBlockTreeDB::ReadAddressFirstLastHeight(uint160 addressHash, int type, int &firstHeight, int &lastHeight)
+{
+    std::unique_ptr<CDBIterator> pcursor(NewIterator());
+    pcursor->Seek(make_pair(DB_ADDRESSINDEX, CAddressIndexIteratorKey(type, addressHash)));
+
+    bool found = false;
+    std::pair<char, CAddressIndexKey> key;
+    while (pcursor->Valid()) {
+        if (!(pcursor->GetKey(key) && key.first == DB_ADDRESSINDEX && key.second.hashBytes == addressHash))
+            break;
+        if (!found) {
+            firstHeight = key.second.blockHeight;
+            found = true;
+        }
+        lastHeight = key.second.blockHeight;
+        pcursor->Next();
+    }
+    return found;
 }
 
 bool CBlockTreeDB::ReadSpentIndex(CSpentIndexKey &key, CSpentIndexValue &value) {
@@ -553,20 +593,21 @@ bool CBlockTreeDB::LoadBlockIndexGuts(
                 pindexNew->nTime          = diskindex.nTime;
                 pindexNew->nBits          = diskindex.nBits;
                 pindexNew->nNonce         = diskindex.nNonce;
-                pindexNew->nSolution      = diskindex.nSolution;
+                // the Equihash solution will be loaded lazily from the dbindex entry
                 pindexNew->nStatus        = diskindex.nStatus;
                 pindexNew->nCachedBranchId = diskindex.nCachedBranchId;
                 pindexNew->nTx            = diskindex.nTx;
+                pindexNew->nChainSupplyDelta = diskindex.nChainSupplyDelta;
+                pindexNew->nTransparentValue = diskindex.nTransparentValue;
+                pindexNew->nBlockFee      = diskindex.nBlockFee;
                 pindexNew->nSproutValue   = diskindex.nSproutValue;
                 pindexNew->nSaplingValue  = diskindex.nSaplingValue;
                 pindexNew->hashFinalSaplingRoot = diskindex.hashFinalSaplingRoot;
                 pindexNew->hashChainHistoryRoot = diskindex.hashChainHistoryRoot;
 
-                // Consistency checks
-                auto header = pindexNew->GetBlockHeader();
-                if (header.GetHash() != pindexNew->GetBlockHash())
-                    return error("LoadBlockIndex(): block header inconsistency detected: on-disk = %s, in-memory = %s",
-                       diskindex.ToString(),  pindexNew->ToString());
+                // Check the block hash against the required difficulty as encoded in the
+                // nBits field. The probability of this succeeding randomly is low enough
+                // that it is a useful check to detect logic or disk storage errors.
                 if (!CheckProofOfWork(pindexNew->GetBlockHash(), pindexNew->nBits, Params().GetConsensus()))
                     return error("LoadBlockIndex(): CheckProofOfWork failed: %s", pindexNew->ToString());
 

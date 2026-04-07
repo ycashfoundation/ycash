@@ -27,6 +27,7 @@
 #include "pow.h"
 #include "reverse_iterator.h"
 #include "rpc/register.h"
+#include "script/script.h"
 #include "txmempool.h"
 #include "ui_interface.h"
 #include "undo.h"
@@ -1851,6 +1852,21 @@ bool GetAddressUnspent(const uint160& addressHash, int type,
     return true;
 }
 
+bool GetAddressFirstLastHeight(const uint160& addressHash, int type,
+        int& firstHeight, int& lastHeight)
+{
+    if (!fAddressIndex)
+        return error("address index not enabled");
+
+    if (!pblocktree->ReadAddressFirstLastHeight(addressHash, type, firstHeight, lastHeight))
+        return error("unable to get first and last height for address");
+
+    return true;
+}
+
+bool GetAddressFirstLastHeight(const uint160& addressHash, int type,
+        int& firstHeight, int& lastHeight);
+
 /**
  * Return transaction in txOut, and if it was found inside a block, its hash is placed in hashBlock.
  * If blockIndex is provided, the transaction is fetched from the corresponding block.
@@ -2668,8 +2684,20 @@ static DisconnectResult DisconnectBlock(const CBlock& block, CValidationState& s
             for (unsigned int k = tx.vout.size(); k-- > 0;) {
                 const CTxOut &out = tx.vout[k];
                 CScript::ScriptType scriptType = out.scriptPubKey.GetType();
-                if (scriptType != CScript::UNKNOWN) {
-                    uint160 const addrHash = out.scriptPubKey.AddressHash();
+                if (scriptType != CScript::UNKNOWN)
+                {
+                    uint160 addrHash;
+
+                    if (scriptType == CScript::P2PK)
+                    {
+                        // mimic P2PKH
+                        scriptType = CScript::P2PKH;
+                        addrHash = Hash160(out.scriptPubKey.begin()+1, out.scriptPubKey.end()-1);
+                    }
+                    else
+                    {
+                        addrHash = out.scriptPubKey.AddressHash();
+                    }
 
                     // undo receiving activity
                     addressIndex.push_back(make_pair(
@@ -2725,8 +2753,20 @@ static DisconnectResult DisconnectBlock(const CBlock& block, CValidationState& s
                 if (fAddressIndex && updateIndices) {
                     const CTxOut &prevout = view.GetOutputFor(input);
                     CScript::ScriptType scriptType = prevout.scriptPubKey.GetType();
-                    if (scriptType != CScript::UNKNOWN) {
-                        uint160 const addrHash = prevout.scriptPubKey.AddressHash();
+                    if (scriptType != CScript::UNKNOWN)
+                    {
+                        uint160 addrHash;
+
+                        if (scriptType == CScript::P2PK)
+                        {
+                            // mimic P2PKH
+                            scriptType = CScript::P2PKH;
+                            addrHash = Hash160(prevout.scriptPubKey.begin()+1, prevout.scriptPubKey.end()-1);
+                        }
+                        else
+                        {
+                            addrHash = prevout.scriptPubKey.AddressHash();
+                        }
 
                         // undo spending activity
                         addressIndex.push_back(make_pair(
@@ -2973,6 +3013,9 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
     auto consensusBranchId = CurrentEpochBranchId(pindex->nHeight, chainparams.GetConsensus());
     auto prevConsensusBranchId = CurrentEpochBranchId(pindex->nHeight - 1, chainparams.GetConsensus());
 
+    // Initialize the chain supply delta to 0
+    CAmount chainSupplyDelta = 0;
+    CAmount transparentValueDelta = 0;
     size_t total_sapling_tx = 0;
 
     std::vector<PrecomputedTransactionData> txdata;
@@ -2987,6 +3030,12 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
         if (nSigOps > MAX_BLOCK_SIGOPS)
             return state.DoS(100, error("ConnectBlock(): too many sigops"),
                              REJECT_INVALID, "bad-blk-sigops");
+
+        // Coinbase transactions are the only case where this vector will not be the same
+        // length as `tx.vin` (since coinbase transactions have a single synthetic input).
+        // Only shielded coinbase transactions will need to produce sighashes for coinbase
+        // transactions; this is handled in ZIP 244 by having the coinbase sighash be the
+        // txid.
 
         if (!tx.IsCoinBase())
         {
@@ -3007,6 +3056,11 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
                 return state.DoS(100, false, rejectCode, rejectReason);
             }
 
+            for (const auto& input : tx.vin) {
+                const auto prevout = view.GetOutputFor(input);
+                transparentValueDelta -= prevout.nValue;
+            }
+
             // insightexplorer
             // https://github.com/bitpay/bitcoin/commit/017f548ea6d89423ef568117447e61dd5707ec42#diff-7ec3c68a81efff79b6ca22ac1f1eabbaR2597
             if (fAddressIndex || fSpentIndex) {
@@ -3015,8 +3069,21 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
                     const CTxIn input = tx.vin[j];
                     const CTxOut &prevout = view.GetOutputFor(tx.vin[j]);
                     CScript::ScriptType scriptType = prevout.scriptPubKey.GetType();
-                    const uint160 addrHash = prevout.scriptPubKey.AddressHash();
-                    if (fAddressIndex && scriptType != CScript::UNKNOWN) {
+                    uint160 addrHash;
+
+                    if (scriptType == CScript::P2PK)
+                    {
+                        // mimic P2PKH
+                        scriptType = CScript::P2PKH;
+                        addrHash = Hash160(prevout.scriptPubKey.begin()+1, prevout.scriptPubKey.end()-1);
+                    }
+                    else
+                    {
+                        addrHash = prevout.scriptPubKey.AddressHash();
+                    }
+
+                    if (fAddressIndex && scriptType != CScript::UNKNOWN)
+                    {
                         // record spending activity
                         addressIndex.push_back(make_pair(
                             CAddressIndexKey(scriptType, addrHash, pindex->nHeight, i, hash, j, true),
@@ -3052,13 +3119,27 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
 
         if (!tx.IsCoinBase())
         {
-            nFees += view.GetValueIn(tx)-tx.GetValueOut();
+            const auto txFee = view.GetValueIn(tx) - tx.GetValueOut();
+            nFees += txFee;
+
+            // Fees from a transaction do not go into an output of the transaction,
+            // and therefore decrease the chain supply. If the miner claims them,
+            // they will be re-added in the other branch of this conditional.
+            chainSupplyDelta -= txFee;
 
             std::vector<CScriptCheck> vChecks;
             bool fCacheResults = fJustCheck; /* Don't cache results if we're actually connecting blocks (still consult the cache, though) */
             if (!ContextualCheckInputs(tx, state, view, fExpensiveChecks, flags, fCacheResults, txdata[i], chainparams.GetConsensus(), consensusBranchId, nScriptCheckThreads ? &vChecks : NULL))
                 return false;
             control.Add(vChecks);
+        }
+        else
+        {
+            // Add the output value of the coinbase transaction to the chain supply
+            // delta.
+            // - This includes fees, which are then canceled out by the fee subtractions
+            //   in the other branch of this conditional.
+            chainSupplyDelta += tx.GetValueOut();
         }
 
         // insightexplorer
@@ -3067,8 +3148,20 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
             for (unsigned int k = 0; k < tx.vout.size(); k++) {
                 const CTxOut &out = tx.vout[k];
                 CScript::ScriptType scriptType = out.scriptPubKey.GetType();
-                if (scriptType != CScript::UNKNOWN) {
-                    uint160 const addrHash = out.scriptPubKey.AddressHash();
+                if (scriptType != CScript::UNKNOWN)
+                {
+                    uint160 addrHash;
+
+                    if (scriptType == CScript::P2PK)
+                    {
+                        // mimic P2PKH
+                        scriptType = CScript::P2PKH;
+                        addrHash = Hash160(out.scriptPubKey.begin()+1, out.scriptPubKey.end()-1);
+                    }
+                    else
+                    {
+                        addrHash = out.scriptPubKey.AddressHash();
+                    }
 
                     // record receiving activity
                     addressIndex.push_back(make_pair(
@@ -3101,6 +3194,10 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
             sapling_tree.append(outputDescription.cmu);
         }
 
+        for (const auto& out : tx.vout) {
+            transparentValueDelta += out.nValue;
+        }
+
         if (!(tx.vShieldedSpend.empty() && tx.vShieldedOutput.empty())) {
             total_sapling_tx += 1;
         }
@@ -3115,6 +3212,28 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
     view.PushAnchor(sprout_tree);
     view.PushAnchor(sapling_tree);
     if (!fJustCheck) {
+        // Update pindex with the net change in value and the chain's total value,
+        // both for the supply and for the transparent pool.
+        pindex->nChainSupplyDelta = chainSupplyDelta;
+        pindex->nTransparentValue = transparentValueDelta;
+        pindex->nBlockFee = nFees;
+        if (pindex->pprev) {
+            if (pindex->pprev->nChainTotalSupply) {
+                pindex->nChainTotalSupply = *pindex->pprev->nChainTotalSupply + chainSupplyDelta;
+            } else {
+                pindex->nChainTotalSupply = std::nullopt;
+            }
+
+            if (pindex->pprev->nChainTransparentValue) {
+                pindex->nChainTransparentValue = *pindex->pprev->nChainTransparentValue + transparentValueDelta;
+            } else {
+                pindex->nChainTransparentValue = std::nullopt;
+            }
+        } else {
+            pindex->nChainTotalSupply = chainSupplyDelta;
+            pindex->nChainTransparentValue = transparentValueDelta;
+        }
+
         pindex->hashFinalSproutRoot = sprout_tree.root();
         // - If this block is before Heartwood activation, then we don't set
         //   hashFinalSaplingRoot here to maintain the invariant documented in
@@ -3185,6 +3304,24 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
                          error("ConnectBlock(): coinbase pays too much (actual=%d vs limit=%d)",
                                block.vtx[0].GetValueOut(), blockReward),
                                REJECT_INVALID, "bad-cb-amount");
+
+    // Ensure that the total chain supply is consistent with the value in each pool.
+    if (!fJustCheck &&
+            pindex->nChainTotalSupply.has_value() &&
+            pindex->nChainTransparentValue.has_value() &&
+            pindex->nChainSproutValue.has_value() &&
+            pindex->nChainSaplingValue.has_value())
+    {
+        auto expectedChainSupply =
+            pindex->nChainTransparentValue.value() +
+            pindex->nChainSproutValue.value() +
+            pindex->nChainSaplingValue.value();
+        if (expectedChainSupply != pindex->nChainTotalSupply.value()) {
+            // This may be added as a rule to ZIP 209 and return a failure in a future soft-fork.
+            error("%s: chain total supply (%d) does not match sum of pool balances (%d) at height %d", __func__,
+                    pindex->nChainTotalSupply.value(), expectedChainSupply, pindex->nHeight);
+        }
+    }
 
     if (!control.Wait())
         return state.DoS(100, false);
@@ -3349,7 +3486,7 @@ bool static FlushStateToDisk(
                 vFiles.push_back(make_pair(*it, &vinfoBlockFile[*it]));
                 it = setDirtyFileInfo.erase(it);
             }
-            std::vector<const CBlockIndex*> vBlocks;
+            std::vector<CBlockIndex*> vBlocks;
             vBlocks.reserve(setDirtyBlockIndex.size());
             for (set<CBlockIndex*>::iterator it = setDirtyBlockIndex.begin(); it != setDirtyBlockIndex.end(); ) {
                 vBlocks.push_back(*it);
@@ -3357,6 +3494,12 @@ bool static FlushStateToDisk(
             }
             if (!pblocktree->WriteBatchSync(vFiles, nLastBlockFile, vBlocks)) {
                 return AbortNode(state, "Files to write to block index database");
+            }
+            // Now that we have written the block indices to the database, we do not
+            // need to store solutions for these CBlockIndex objects in memory.
+            // cs_main must be held here.
+            for (CBlockIndex *pblockindex : vBlocks) {
+                pblockindex->TrimSolution();
             }
         }
         // Finally remove any pruned files
@@ -4085,19 +4228,31 @@ void FallbackSproutValuePoolBalance(
     }
 }
 
-/** Mark a block as having its data received and checked (up to BLOCK_VALID_TRANSACTIONS). */
-bool ReceivedBlockTransactions(
-    const CBlock &block,
-    CValidationState& state,
+// Compute the effect of `block` on the chain supply and the value in each value pool.
+// This requires `pindex->nHeight` and `pindex->pprev` to be set, but nothing else.
+void SetChainPoolValues(
     const CChainParams& chainparams,
-    CBlockIndex *pindexNew,
-    const CDiskBlockPos& pos)
+    const CBlock &block,
+    CBlockIndex *pindex)
 {
-    pindexNew->nTx = block.vtx.size();
-    pindexNew->nChainTx = 0;
+    // the following values are computed here only for the genesis block
+    CAmount chainSupplyDelta = 0;
+    CAmount transparentValueDelta = 0;
+    CAmount blockFee = 0;
+
     CAmount sproutValue = 0;
     CAmount saplingValue = 0;
+
     for (auto tx : block.vtx) {
+        // For the genesis block only, compute the chain supply delta and the transparent
+        // output total.
+        if (pindex->pprev == nullptr) {
+            chainSupplyDelta = tx.GetValueOut();
+            for (const auto& out : tx.vout) {
+                transparentValueDelta += out.nValue;
+            }
+        }
+
         // Negative valueBalance "takes" money from the transparent value pool
         // and adds it to the Sapling value pool. Positive valueBalance "gives"
         // money to the transparent value pool, removing from the Sapling value
@@ -4109,16 +4264,45 @@ bool ReceivedBlockTransactions(
             sproutValue -= js.vpub_new;
         }
     }
-    pindexNew->nSproutValue = sproutValue;
-    pindexNew->nChainSproutValue = std::nullopt;
-    pindexNew->nSaplingValue = saplingValue;
-    pindexNew->nChainSaplingValue = std::nullopt;
+
+    // These values can only be computed here for the genesis block.
+    // For all other blocks, we update them in ConnectBlock instead.
+    if (pindex->pprev == nullptr) {
+        pindex->nChainSupplyDelta = chainSupplyDelta;
+        pindex->nTransparentValue = transparentValueDelta;
+        pindex->nBlockFee = blockFee;
+    } else {
+        pindex->nChainSupplyDelta = std::nullopt;
+        pindex->nTransparentValue = std::nullopt;
+        pindex->nBlockFee = std::nullopt;
+    }
+
+    pindex->nChainTotalSupply = std::nullopt;
+    pindex->nChainTransparentValue = std::nullopt;
+
+    pindex->nSproutValue = sproutValue;
+    pindex->nChainSproutValue = std::nullopt;
+    pindex->nSaplingValue = saplingValue;
+    pindex->nChainSaplingValue = std::nullopt;
+}
+
+
+/** Mark a block as having its data received and checked (up to BLOCK_VALID_TRANSACTIONS). */
+bool ReceivedBlockTransactions(
+    const CBlock &block,
+    CValidationState& state,
+    const CChainParams& chainparams,
+    CBlockIndex *pindexNew,
+    const CDiskBlockPos& pos)
+{
+    pindexNew->nTx = block.vtx.size();
+    pindexNew->nChainTx = 0;
+
     pindexNew->nFile = pos.nFile;
     pindexNew->nDataPos = pos.nPos;
     pindexNew->nUndoPos = 0;
     pindexNew->nStatus |= BLOCK_HAVE_DATA;
     pindexNew->RaiseValidity(BLOCK_VALID_TRANSACTIONS);
-    setDirtyBlockIndex.insert(pindexNew);
 
     if (pindexNew->pprev == NULL || pindexNew->pprev->nChainTx) {
         // If pindexNew is the genesis block or all parents are BLOCK_VALID_TRANSACTIONS.
@@ -4130,18 +4314,29 @@ bool ReceivedBlockTransactions(
             CBlockIndex *pindex = queue.front();
             queue.pop_front();
             pindex->nChainTx = (pindex->pprev ? pindex->pprev->nChainTx : 0) + pindex->nTx;
+
             if (pindex->pprev) {
+                // Transparent value and chain total supply are added to the
+                // block index only in `ConnectBlock`, because that's the only
+                // place that we have a valid coins view with which to compute
+                // the transparent input value and fees.
+
+                // Calculate the block's effect on the Sprout chain value pool balance.
                 if (pindex->pprev->nChainSproutValue && pindex->nSproutValue) {
                     pindex->nChainSproutValue = *pindex->pprev->nChainSproutValue + *pindex->nSproutValue;
                 } else {
                     pindex->nChainSproutValue = std::nullopt;
                 }
+
+                // Calculate the block's effect on the Sapling chain value pool balance.
                 if (pindex->pprev->nChainSaplingValue) {
                     pindex->nChainSaplingValue = *pindex->pprev->nChainSaplingValue + pindex->nSaplingValue;
                 } else {
                     pindex->nChainSaplingValue = std::nullopt;
                 }
             } else {
+                pindex->nChainTotalSupply = pindex->nChainSupplyDelta;
+                pindex->nChainTransparentValue = pindex->nTransparentValue;
                 pindex->nChainSproutValue = pindex->nSproutValue;
                 pindex->nChainSaplingValue = pindex->nSaplingValue;
             }
@@ -4170,6 +4365,7 @@ bool ReceivedBlockTransactions(
 
     return true;
 }
+
 
 bool FindBlockPos(CValidationState &state, CDiskBlockPos &pos, unsigned int nAddSize, unsigned int nHeight, uint64_t nTime, bool fKnown = false)
 {
@@ -4587,6 +4783,8 @@ static bool AcceptBlock(const CBlock& block, CValidationState& state, const CCha
     if (!AcceptBlockHeader(block, state, chainparams, &pindex))
         return false;
 
+    SetChainPoolValues(chainparams, block, pindex);
+
     // Try to process all requested blocks that we don't have, but only
     // process an unrequested block if it's new and has enough work to
     // advance our tip, and isn't too many blocks ahead.
@@ -4697,6 +4895,8 @@ bool TestBlockValidity(CValidationState& state, const CChainParams& chainparams,
     CBlockIndex indexDummy(block);
     indexDummy.pprev = pindexPrev;
     indexDummy.nHeight = pindexPrev->nHeight + 1;
+    SetChainPoolValues(chainparams, block, &indexDummy);
+
     // JoinSplit proofs are verified in ConnectBlock
     auto verifier = ProofVerifier::Disabled();
 
@@ -4911,11 +5111,25 @@ bool static LoadBlockIndexDB(const CChainParams& chainparams)
             if (pindex->pprev) {
                 if (pindex->pprev->nChainTx) {
                     pindex->nChainTx = pindex->pprev->nChainTx + pindex->nTx;
+
+                    if (pindex->pprev->nChainTotalSupply && pindex->nChainSupplyDelta) {
+                        pindex->nChainTotalSupply = *pindex->pprev->nChainTotalSupply + *pindex->nChainSupplyDelta;
+                    } else {
+                        pindex->nChainTotalSupply = std::nullopt;
+                    }
+
+                    if (pindex->pprev->nChainTransparentValue && pindex->nTransparentValue) {
+                        pindex->nChainTransparentValue = *pindex->pprev->nChainTransparentValue + *pindex->nTransparentValue;
+                    } else {
+                        pindex->nChainTransparentValue = std::nullopt;
+                    }
+
                     if (pindex->pprev->nChainSproutValue && pindex->nSproutValue) {
                         pindex->nChainSproutValue = *pindex->pprev->nChainSproutValue + *pindex->nSproutValue;
                     } else {
                         pindex->nChainSproutValue = std::nullopt;
                     }
+
                     if (pindex->pprev->nChainSaplingValue) {
                         pindex->nChainSaplingValue = *pindex->pprev->nChainSaplingValue + pindex->nSaplingValue;
                     } else {
@@ -4923,12 +5137,16 @@ bool static LoadBlockIndexDB(const CChainParams& chainparams)
                     }
                 } else {
                     pindex->nChainTx = 0;
+                    pindex->nChainTotalSupply = std::nullopt;
+                    pindex->nChainTransparentValue = std::nullopt;
                     pindex->nChainSproutValue = std::nullopt;
                     pindex->nChainSaplingValue = std::nullopt;
                     mapBlocksUnlinked.insert(std::make_pair(pindex->pprev, pindex));
                 }
             } else {
                 pindex->nChainTx = pindex->nTx;
+                pindex->nChainTotalSupply = pindex->nChainSupplyDelta;
+                pindex->nChainTransparentValue = pindex->nTransparentValue;
                 pindex->nChainSproutValue = pindex->nSproutValue;
                 pindex->nChainSaplingValue = pindex->nSaplingValue;
             }
@@ -5424,6 +5642,8 @@ bool InitBlockIndex(const CChainParams& chainparams)
             if (!WriteBlockToDisk(block, blockPos, chainparams.MessageStart()))
                 return error("LoadBlockIndex(): writing genesis block to disk failed");
             CBlockIndex *pindex = AddToBlockIndex(block, chainparams.GetConsensus());
+            SetChainPoolValues(chainparams, block, pindex);
+            setDirtyBlockIndex.insert(pindex);
             if (!ReceivedBlockTransactions(block, state, chainparams, pindex, blockPos))
                 return error("LoadBlockIndex(): genesis block not accepted");
             if (!ActivateBestChain(state, chainparams, &block))
