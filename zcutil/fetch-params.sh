@@ -20,8 +20,13 @@ SAPLING_SPROUT_GROTH16_NAME='sprout-groth16.params'
 DOWNLOAD_URL="https://download.z.cash/downloads"
 IPFS_HASH="/ipfs/QmXRHVGLQBiKwvNq7c2vPxAKz1zRVmMYbmt7G5TQss7tY7"
 
-SHA256CMD="$(command -v sha256sum || echo shasum)"
-SHA256ARGS="$(command -v sha256sum >/dev/null || echo \"-a 256\")"
+if command -v sha256sum >/dev/null 2>&1; then
+    SHA256CMD="sha256sum"
+    SHA256ARGS=""
+else
+    SHA256CMD="shasum"
+    SHA256ARGS="-a 256"
+fi
 
 WGETCMD="$(command -v wget || echo '')"
 IPFSCMD="$(command -v ipfs || echo '')"
@@ -31,8 +36,6 @@ CURLCMD="$(command -v curl || echo '')"
 ZC_DISABLE_WGET="${ZC_DISABLE_WGET:-}"
 ZC_DISABLE_IPFS="${ZC_DISABLE_IPFS:-}"
 ZC_DISABLE_CURL="${ZC_DISABLE_CURL:-}"
-
-LOCKFILE=/tmp/fetch_params.lock
 
 fetch_wget() {
     if [ -z "$WGETCMD" ] || ! [ -z "$ZC_DISABLE_WGET" ]; then
@@ -127,12 +130,14 @@ fetch_params() {
         cat "${dlname}.part.1" "${dlname}.part.2" > "${dlname}"
         rm "${dlname}.part.1" "${dlname}.part.2"
 
-        "$SHA256CMD" $SHA256ARGS -c <<EOF
-$expectedhash  $dlname
-EOF
+        actual_hash="$($SHA256CMD $SHA256ARGS "$dlname" | awk '{print $1}')"
+        if [ "$actual_hash" = "$expectedhash" ]; then
+            CHECKSUM_RESULT=0
+        else
+            CHECKSUM_RESULT=1
+        fi
 
-        # Check the exit code of the shasum command:
-        CHECKSUM_RESULT=$?
+        # Check the result of the checksum comparison:
         if [ $CHECKSUM_RESULT -eq 0 ]; then
             mv -v "$dlname" "$output"
         else
@@ -141,27 +146,20 @@ EOF
         fi
     fi
 
-    unset -v filename
-    unset -v output
-    unset -v dlname
-    unset -v expectedhash
+    unset filename
+    unset output
+    unset dlname
+    unset expectedhash
 }
 
-# Use flock to prevent parallel execution.
+# Use mkdir-based locking (atomic and portable across Linux/macOS).
+LOCKFILE=/tmp/fetch_params_lock
 lock() {
-    if [ "$uname_S" = "Darwin" ]; then
-        if shlock -f ${LOCKFILE} -p $$; then
-            return 0
-        else
-            return 1
-        fi
+    if mkdir "$LOCKFILE" 2>/dev/null; then
+        trap 'rmdir "$LOCKFILE" 2>/dev/null || true' EXIT INT TERM
+        return 0
     else
-        # create lock file
-        eval "exec 9>$LOCKFILE"
-        # acquire the lock
-        flock -n 9 \
-            && return 0 \
-            || return 1
+        return 1
     fi
 }
 
@@ -233,5 +231,5 @@ then
 fi
 
 main
-rm -f $LOCKFILE
+rmdir "$LOCKFILE" 2>/dev/null || true
 exit 0
