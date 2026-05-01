@@ -1034,7 +1034,7 @@ UniValue getaddressbalance(const UniValue& params, bool fHelp)
     UniValue result(UniValue::VOBJ);
     result.pushKV("balance", balance);
     result.pushKV("received", received);
-    result.pushKV("txcount", txids.size());
+    result.pushKV("txcount", (uint64_t)txids.size());
     return result;
 }
 
